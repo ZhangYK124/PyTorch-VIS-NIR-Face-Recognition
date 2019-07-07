@@ -50,10 +50,16 @@ if __name__ == '__main__':
     for image_name in os.listdir(source_root):
         print("Processing\t{}".format(os.path.join(source_root, image_name)))
         img = Image.open(os.path.join(source_root, image_name))
-        img.save(os.path.join(dest_root,image_name.split('.')[0]+'.jpg'),'jpeg',quality=100)
-        img = Image.open(os.path.join(dest_root,image_name.split('.')[0]+'.jpg'))
+        
+        if not os.path.isdir(os.path.join(dest_root,image_name.split('.')[0])):
+            os.mkdir(os.path.join(dest_root,image_name.split('.')[0]))
+            
+        img.save(os.path.join(dest_root,image_name.split('.')[0],image_name.split('.')[0]+'.jpg'),'jpeg',quality=100)
+        
+        img = Image.open(os.path.join(dest_root,image_name.split('.')[0],image_name.split('.')[0]+'.jpg'))
         img = img.convert('RGB')
         arr_img = np.array(img)
+        
         try: # Handle exception
             _, landmarks = detect_faces(img)
         except Exception:
@@ -67,4 +73,25 @@ if __name__ == '__main__':
         img_warped = Image.fromarray(warped_face[0])
         if image_name.split('.')[-1].lower() not in ['jpg', 'jpeg']: #not from jpg
             image_name = '.'.join(image_name.split('.')[:-1]) + '.jpg'
-        img_warped.save(os.path.join(dest_root, image_name.split('.')[0]+'.jpg'),quality=100)
+        img_warped.save(os.path.join(dest_root,image_name.split('.')[0],image_name.split('.')[0]+'.jpg'),quality=100)
+        
+        img = Image.open(os.path.join(dest_root,image_name.split('.')[0],image_name.split('.')[0]+'.jpg'))
+
+        _, landmark = detect_faces(img)
+        if len(landmark)==0:
+            print('abcdefghijklmnopqrstuvwxyz')
+            continue
+        else:
+            facial_5_points = [[landmark[0][j], landmark[0][j + 5]] for j in range(5)]
+            
+            left_eye_landmark = facial_5_points[0]
+            left_eye_img = img.crop((left_eye_landmark[0] - 11, left_eye_landmark[1] - 11, left_eye_landmark[0] + 11,
+                            left_eye_landmark[1] + 11))
+            left_eye_img.save(os.path.join(dest_root,image_name.split('.')[0],'left_eye.jpg'),quality=100)
+            print(image_name,'  left eye')
+    
+            right_eye_landmark = facial_5_points[1]
+            right_eye_img = img.crop((right_eye_landmark[0] - 11, right_eye_landmark[1] - 11, right_eye_landmark[0] + 11,
+                                      right_eye_landmark[1] + 11))
+            right_eye_img.save(os.path.join(dest_root, image_name.split('.')[0], 'right_eye.jpg'), quality=100)
+            print(image_name, '  right eye')
