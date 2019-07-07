@@ -120,6 +120,8 @@ class Discriminator(nn.Module):
         super(Discriminator,self).__init__()
         self.conv = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
         self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=64, out_channel=64)
+        self.bn = nn.BatchNorm2d(64,affine=True)
+        self.out_layer = nn.Sigmoid()
         
         
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
@@ -127,4 +129,12 @@ class Discriminator(nn.Module):
         for _ in range(num_of_layer):
             layers.append(block(in_channel,out_channel))
         return nn.Sequential(*layers)
+    
+    def forward(self, x):
+        out = self.conv(x)
+        out = self.residual3(out)
+        out = self.bn(out)
+        out = self.out_layer(out)
+        return out
+        
         
