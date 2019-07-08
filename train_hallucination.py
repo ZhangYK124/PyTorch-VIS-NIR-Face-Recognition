@@ -48,10 +48,11 @@ if __name__=='__main__':
     G_N2V = Generator()
     G_V2N = Generator()
     
-    D_N.apply(weights_init)
-    D_V.apply(weights_init)
-    G_N2V.apply(weights_init)
-    G_V2N.apply(weights_init)
+    if config.train['cuda']:
+        D_V.cuda()
+        D_N.cuda()
+        G_N2V.cuda()
+        G_V2N.cuda()
     
     # Optimizer
     optimizer_D_N = torch.optim.Adam(D_N.parameters(),lr=config.train['lr_D_N'],betas=(config.train['beta1_D_N'],config.train['beta2_D_N']),weight_decay=config.train['weight_decay_D_N'])
@@ -59,15 +60,55 @@ if __name__=='__main__':
     optimizer_G_V2N = torch.optim.Adam(G_V2N.parameters(),lr=config.train['lr_G_V2N'],betas=(config.train['beta1_G_V2N'],config.train['beta2_G_N2V']),weight_decay=config.train['weight_decay_G_V2N'])
     optimizer_G_N2V = torch.optim.Adam(G_N2V.parameters(),lr=config.train['lr_G_N2V'],betas=(config.train['beta1_G_N2V'],config.train['beta2_G_N2V']),weight_decay=config.train['weight_decay_G_N2V'])
     
+    
     if config.train['resume_G_N2V']:
         checkpoint = torch.load(config.train['resume_G_N2V'])
         G_N2V.load_state_dict(checkpoint['state_dict'])
         start_epoch = checkpoint['epoch']
+    else:
+        G_N2V.apply(weights_init)
+        start_epoch = 0
         
     if config.train['resume_G_V2N']:
         checkpoint = torch.load(config.train['resume_G_V2N'])
         G_V2N.load_state_dict(checkpoint['state_dict'])
         start_epoch = checkpoint['epoch']
+    else:
+        G_V2N.apply(weights_init)
+        start_epoch = 0
+        
+    if config.train['resume_D_V']:
+        checkpoint = torch.load(config.train['resume_D_V'])
+        G_V2N.load_state_dict(checkpoint['state_dict'])
+        start_epoch = checkpoint['epoch']
+    else:
+        D_V.apply(weights_init)
+        start_epoch = 0
+        
+    if config.train['resume_D_N']:
+        checkpoint = torch.load(config.train['resume_D_N'])
+        G_V2N.load_state_dict(checkpoint['state_dict'])
+        start_epoch = checkpoint['epoch']
+    else:
+        D_N.apply(weights_init)
+        start_epoch = 0
+        
+    # Training
+    if config.train['if_train']:
+        D_V.train()
+        D_N.train()
+        G_V2N.train()
+        G_N2V.train()
+        for epoch in range(start_epoch,config.train['epochs']):
+            batch_time = AverageMeter()
+            data_time = AverageMeter()
+            losses = AverageMeter()
+            end_time = time.time()
+            
+            bar = Bar('Processing: ',max=len(trainLoader))
+            
+            
+        
         
         
         
