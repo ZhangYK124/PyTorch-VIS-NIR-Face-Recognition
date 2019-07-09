@@ -17,6 +17,7 @@ class _Residual_Block(nn.Module):
                                bias=False)
         # self.conv1 = OctConv(ch_in=in_channels,ch_out=out_channels,kernel_size=3,stride=1,alphas=(0,0.5))
         self.in1 = nn.InstanceNorm2d(out_channels, affine=True)
+        self.bn1 = nn.BatchNorm2d(out_channels)
         # self.batch_channel = int(160*out_channels/64)
         # self.in1 = nn.InstanceNorm2d(self.batch_channel, affine=True)
         self.relu = nn.PReLU(out_channels)
@@ -24,14 +25,15 @@ class _Residual_Block(nn.Module):
                                bias=False)
         # self.conv2 = OctConv(ch_in=in_channels, ch_out=out_channels, kernel_size=3, stride=1, alphas=(0.5, 0))
         self.in2 = nn.InstanceNorm2d(out_channels, affine=True)
+        self.bn2 = nn.BatchNorm2d(out_channels)
         self.relu_out = nn.PReLU(out_channels)
     
     def forward(self, x):
         identity_data = x
         out = self.conv1(x)
-        out = self.relu(self.in1(out))
+        out = self.relu(self.bn1(out))
         out = self.conv2(out)
-        out = self.in2(out)
+        out = self.bn2(out)
         out = torch.add(out, identity_data)
         out = self.relu_out(out)
         return out
@@ -39,9 +41,10 @@ class _Residual_Block(nn.Module):
 class LocalPathWay(nn.Module):
     def __init__(self):
         super(LocalPathWay,self).__init__()
-        self.conv = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
-        self.residual = self.make_layer(_Residual_Block, 3, in_channel=64, out_channel=64)
-        self.conv_out = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.conv = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=3,stride=1,padding=1,bias=False)
+        self.residual = self.make_layer(_Residual_Block, 3, in_channel=128, out_channel=128)
+        self.bn = nn.BatchNorm2d(128,affine=True)
+        self.conv_out = nn.Conv2d(in_channels=128,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
 
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
         layers = []
@@ -51,7 +54,9 @@ class LocalPathWay(nn.Module):
     
     def forward(self,x):
         out = self.conv(x)
-        out_feature = self.residual(out)
+        out = self.residual(out)
+        out = self.residual(out)
+        out_feature = self.bn(out)
         local_img = self.conv_out(out_feature)
         return out_feature, local_img
     
@@ -66,17 +71,22 @@ class LocalFuser(nn.Module):
     def forward(self,f_left_eye,f_right_eye):
         EYE_W, EYE_H = 22,22
         IMG_SIZE = 112
-        f_left_eye = torch.nn.functional.pad(f_left_eye,(38 - EYE_W//2  - 1 ,IMG_SIZE - (38 + EYE_W//2 - 1) ,54 - EYE_H//2 - 1, IMG_SIZE - (54 + EYE_H//2 - 1)),'constant',0)
-        f_right_eye = torch.nn.functional.pad(f_right_eye,(38 - EYE_W//2  - 1 ,IMG_SIZE - (38 + EYE_W//2 - 1) ,54 - EYE_H//2 - 1, IMG_SIZE - (54 + EYE_H//2 - 1)))
-        return torch.max(torch.stack([f_left_eye,f_right_eye],dim=0),dim=0)[0]
-    
+        f_left_eye_out = torch.nn.functional.pad(f_left_eye,(38 - EYE_W//2  - 1 ,IMG_SIZE - (38 + EYE_W//2 - 1) ,54 - EYE_H//2 - 1, IMG_SIZE - (54 + EYE_H//2 - 1)),'constant',0)
+        f_right_eye_out = torch.nn.functional.pad(f_right_eye,(IMG_SIZE - (38 + EYE_W//2 - 1) ,38 - EYE_W//2  - 1  ,54 - EYE_H//2 - 1, IMG_SIZE - (54 + EYE_H//2 - 1)))
+        # out = torch.stack([f_left_eye_out,f_right_eye_out],dim=0)
+        out = f_left_eye_out+f_right_eye_out
+        # out = torch.max(out,dim=0)
+        # return torch.max(torch.stack([f_left_eye_out,f_right_eye_out],dim=0),dim=0)[0]
+        return out
 class GlobalPathWay(nn.Module):
-    def __init(self):
+    def __init__(self):
         super(GlobalPathWay,self).__init__()
-        self.conv = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
-        self.residual6 = self.make_layer(_Residual_Block, 6, in_channel=64, out_channel=64)
-        self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=192, out_channel=192)
-        self.conv_out = nn.Conv2d(in_channels=192,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.conv_in = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=3,stride=1,padding=1,bias=False)
+        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128)
+        self.residual6_2 = self.make_layer(_Residual_Block,6,in_channel=128,out_channel=128)
+        self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=256, out_channel=256)
+        self.bn = nn.BatchNorm2d(256,affine=True)
+        self.conv_out = nn.Conv2d(in_channels=256,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
 
         
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
@@ -86,10 +96,12 @@ class GlobalPathWay(nn.Module):
         return nn.Sequential(*layers)
         
     def forward(self, I112,local_feature):
-        out = self.conv(I112)
-        out = self.residual6(out)
+        out = self.conv_in(I112)
+        out = self.residual6_1(out)
+        # out = self.residual6_2(out)
         out = torch.cat([out,local_feature],dim=1)
         out = self.residual3(out)
+        out = self.bn(out)
         out = self.conv_out(out)
         return out
     
@@ -113,7 +125,7 @@ class Generator(nn.Module):
         
         # path through global pathway
         I112_fake = self.global_pathway(I112,local_feature)
-        return I112_fake, local_vision,local_input
+        return I112_fake, local_vision,local_input,left_fake,right_fake
     
 class Discriminator(nn.Module):
     def __init__(self):
@@ -122,7 +134,7 @@ class Discriminator(nn.Module):
         self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=64, out_channel=64)
         self.bn = nn.BatchNorm2d(64,affine=True)
         self.out_layer = nn.Sigmoid()
-        
+        self.conv_out = nn.Conv2d(in_channels=64,out_channels=1,kernel_size=3,stride=1,padding=1,bias=False)
         
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
         layers = []
@@ -134,7 +146,14 @@ class Discriminator(nn.Module):
         out = self.conv(x)
         out = self.residual3(out)
         out = self.bn(out)
-        out = self.out_layer(out)
-        return out
+        out = self.conv_out(out)
+        return F.avg_pool2d(out,out.size()[2:]).view(out.size()[0],-1)
+    
+if __name__ == '__main__':
+    model = Discriminator().cuda()
+    # model = Generator().cuda()
+    input = Variable(torch.rand(3,3,112,112)).cuda()
+    output = model(input)
+    print(model(input)[0].size())
         
         

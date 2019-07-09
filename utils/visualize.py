@@ -5,9 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 from .misc import *
-from helen_loader import HelenLoader as helenloader
 from PIL import Image
-from helen_loader import HelenLoader
 
 import os
 import scipy.misc as m
