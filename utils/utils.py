@@ -11,20 +11,20 @@ import time
 import warnings
 import PIL.Image as Image
 import copy
+import random
+from torch.autograd import Variable
 
 import tensorflow as tf
 
 import pandas as pd
 import csv
-import os
-import numpy as np
 import sys
-import torch
 import shutil
 import pickle
 from sklearn.model_selection import KFold
 from sklearn.decomposition import PCA
 import sklearn
+import scipy.misc as m
 from scipy import interpolate
 
 def schedule_lr(optimizer,origin_lr,lr_decay_rate,epoch):
@@ -33,6 +33,46 @@ def schedule_lr(optimizer,origin_lr,lr_decay_rate,epoch):
         # params['lr'] /= 10.
         params['lr'] = lr
     # print(optimizer)
+    
+def save_model(state,model_name,epoch):
+    # state is a dictionary
+    # key: state_dict, best_loss, optim, epoch
+    torch.save( state , '{}_epoch{}.pth'.format(model_name,epoch ) )
+    
+class ReplayBuffer():
+    def __init__(self, max_size=50):
+        assert (max_size > 0), 'Empty buffer or trying to create a black hole. Be careful.'
+        self.max_size = max_size
+        self.data = []
+
+    def push_and_pop(self, data):
+        to_return = []
+        for element in data.data:
+            element = torch.unsqueeze(element, 0)
+            if len(self.data) < self.max_size:
+                self.data.append(element)
+                to_return.append(element)
+            else:
+                if random.uniform(0,1) > 0.5:
+                    i = random.randint(0, self.max_size-1)
+                    to_return.append(self.data[i].clone())
+                    self.data[i] = element
+                else:
+                    to_return.append(element)
+        return Variable(torch.cat(to_return))
+    
+class LambdaLR():
+    def __init__(self, n_epochs, decay_rate, decay_start_epoch,origin_lr):
+        assert ((n_epochs - decay_start_epoch) > 0), "Decay must start before the training session ends!"
+        self.n_epochs = n_epochs
+        self.decay_rate = decay_rate
+        self.decay_start_epoch = decay_start_epoch
+        self.origin_lr = origin_lr
+
+    def step(self, epoch):
+        # return 1.0 - max(0, epoch + self.offset - self.decay_start_epoch)/(self.n_epochs - self.decay_start_epoch)
+        return self.origin_lr*self.decay_rate**max(0,epoch-self.decay_start_epoch)
+    
 
 def calculate_accuracy(threshold, dist, actual_issame):
     predict_issame = np.less(dist, threshold)
@@ -289,11 +329,13 @@ def make_image_grid(x, ngrid):
 
 def save_image_single(x, path, imsize=512):
     from PIL import Image
-    grid = make_image_grid(x, 1)
-    ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).numpy()
-    im = Image.fromarray(ndarr)
-    im = im.resize((imsize,imsize), Image.NEAREST)
-    im.save(path)
+    # grid = make_image_grid(x, 1)
+    # ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).numpy()
+    image = m.toimage(x)
+    image.save(path)
+    # im = Image.fromarray(ndarr)
+    # im = im.resize((imsize,imsize), Image.NEAREST)
+    # im.save(path)
 
 
 def save_image_grid(x, path, imsize=512, ngrid=4):
@@ -303,10 +345,6 @@ def save_image_grid(x, path, imsize=512, ngrid=4):
     im = Image.fromarray(ndarr)
     im = im.resize((imsize,imsize), Image.NEAREST)
     im.save(path)
-
-
-
-
 
 def make_summary(writer, key, value, step):
     if hasattr(value, '__len__'):

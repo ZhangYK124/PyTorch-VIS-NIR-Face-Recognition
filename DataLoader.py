@@ -19,8 +19,8 @@ import pdb
 class Dataset(data.Dataset):
     def __init__(self):
         
-        self.vis_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR_Aligned/'
-        self.nir_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/VIS_Aligned/'
+        self.vis_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/VIS_Aligned/'
+        self.nir_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR_Aligned/'
         self.vis_img_list = os.listdir(self.vis_root)
         self.nir_img_list = os.listdir(self.nir_root)
 
@@ -32,7 +32,7 @@ class Dataset(data.Dataset):
         )
         
     def __len__(self):
-        return min(len(glob.glob(self.vis_root)),len(glob.glob(self.nir_root)))
+        return min(len(self.vis_img_list),len(self.nir_img_list))
     
     def __getitem__(self, index):
         vis_img = Image.open(os.path.join(self.vis_root,self.vis_img_list[index],self.vis_img_list[index]+'.jpg'))
@@ -57,10 +57,13 @@ class Dataset(data.Dataset):
             nir_left_eye_img = nir_right_eye_img
             nir_right_eye_img = temp
             
-            vis_left_eye_img = vis_right_eye_img.transpose(Image.FLIP_LEFT_RIGHT)
+            vis_left_eye_img = vis_left_eye_img.transpose(Image.FLIP_LEFT_RIGHT)
             vis_right_eye_img = vis_right_eye_img.transpose(Image.FLIP_LEFT_RIGHT)
             nir_left_eye_img = nir_left_eye_img.transpose(Image.FLIP_LEFT_RIGHT)
             nir_right_eye_img = nir_right_eye_img.transpose(Image.FLIP_LEFT_RIGHT)
+            
+            vis_img = vis_img.transpose(Image.FLIP_LEFT_RIGHT)
+            nir_img = nir_img.transpose(Image.FLIP_LEFT_RIGHT)
       
         batch = {}
         batch['vis'] = vis_img
