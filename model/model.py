@@ -41,10 +41,10 @@ class _Residual_Block(nn.Module):
 class LocalPathWay(nn.Module):
     def __init__(self):
         super(LocalPathWay,self).__init__()
-        self.conv = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=3,stride=1,padding=1,bias=False)
-        self.residual = self.make_layer(_Residual_Block, 3, in_channel=128, out_channel=128)
-        self.bn = nn.BatchNorm2d(128,affine=True)
-        self.conv_out = nn.Conv2d(in_channels=128,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.conv = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
+        self.residual = self.make_layer(_Residual_Block, 3, in_channel=64, out_channel=64)
+        self.bn = nn.BatchNorm2d(64,affine=True)
+        self.conv_out = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
 
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
         layers = []
@@ -81,12 +81,12 @@ class LocalFuser(nn.Module):
 class GlobalPathWay(nn.Module):
     def __init__(self):
         super(GlobalPathWay,self).__init__()
-        self.conv_in = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=3,stride=1,padding=1,bias=False)
-        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128)
-        self.residual6_2 = self.make_layer(_Residual_Block,6,in_channel=128,out_channel=128)
-        self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=256, out_channel=256)
-        self.bn = nn.BatchNorm2d(256,affine=True)
-        self.conv_out = nn.Conv2d(in_channels=256,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.conv_in = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
+        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=64, out_channel=64)
+        self.residual6_2 = self.make_layer(_Residual_Block,6,in_channel=64,out_channel=64)
+        self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=128, out_channel=128)
+        self.bn = nn.BatchNorm2d(128,affine=True)
+        self.conv_out = nn.Conv2d(in_channels=128,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
 
         
     def make_layer(self, block, num_of_layer,in_channel, out_channel):

@@ -122,6 +122,8 @@ if __name__=='__main__':
     fake_local_nir_buffer = ReplayBuffer()
 
     prev_time = time.time()
+
+    count = int(len(trainLoader) // 4)
     # Training
     if config.train['if_train']:
         for epoch in range(start_epoch,config.train['epochs']):
@@ -172,7 +174,11 @@ if __name__=='__main__':
                 loss_G_V2N = mse_loss(pred_fake_nir,target_real) + mse_loss(pred_fake_nir_local,target_real)
                 
                 # Identity Loss
-                # identity_loss_G_V2N = mse_loss()
+                identity_fake_nir, identity_fake_local_nir, identity_real_local_nir, identity_fake_local_nir_left_eye, identity_fake_local_nir_right_eye = G_V2N(real_nir, real_nir_left_eye, real_nir_right_eye)
+                identity_fake_vis, identity_fake_local_vis, identity_real_local_vis, identity_fake_local_vis_left_eye, identity_fake_local_vis_right_eye = G_N2V(real_vis,real_vis_left_eye, real_vis_right_eye)
+                identity_loss_G_V2N = l1_loss(identity_fake_vis,real_vis) + l1_loss(identity_fake_local_vis_left_eye,real_vis_left_eye) + l1_loss(identity_fake_local_vis_right_eye,real_nir_right_eye)
+                identity_loss_G_N2V = l1_loss(identity_fake_nir,real_nir) + l1_loss(identity_fake_local_nir_left_eye,real_nir_left_eye) + l1_loss(identity_fake_local_nir_right_eye,real_nir_right_eye)
+                identity_loss = identity_loss_G_V2N + identity_loss_G_N2V
                 
                 # Cycle Loss
                 recovered_nir,recovered_local_nir,_,recovered_local_nir_left_eye,recovered_local_nir_right_eye = G_V2N(fake_vis,fake_local_vis_left_eye,fake_local_vis_right_eye)
@@ -184,7 +190,7 @@ if __name__=='__main__':
                 cycle_loss = cycle_loss_NVN + cycle_loss_VNV
                 
                 # Total Loss
-                loss_G = loss_G_N2V + loss_G_V2N + cycle_loss
+                loss_G = loss_G_N2V + loss_G_V2N + cycle_loss * config.train['lambda_cyc_loss'] + identity_loss * config.train['lambda_id_loss']
                 
                 loss_G.backward()
                 optimizer_G.step()
@@ -246,7 +252,7 @@ if __name__=='__main__':
                 time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                 prev_time = time.time()
                 
-                bar.suffix = '(Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.4f} | LR_D_V: {lr_D_V:.4f} | LR_D_N: {lr_D_N:.4f} | ' \
+                bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.4f} | LR_D_V: {lr_D_V:.4f} | LR_D_N: {lr_D_N:.4f} | ' \
                              'Loss_G: {loss_G:.4f} | Loss_D_N: {loss_D_N:.4f} | Loss_D_V: {loss_D_V:.4f} | ETA: {time_left}'.format(
                     step=i,
                     epoch=epoch,
@@ -260,7 +266,7 @@ if __name__=='__main__':
                 )
                 print(bar.suffix)
                 # Save Image
-                count = 500
+                
                 if i%count==0:
                     fake_nir_single = fake_nir.detach().cpu().numpy()[0]
                     fake_nir_single_name = 'fake_nir_{}_{}.png'.format(epoch,i//count)
@@ -282,6 +288,15 @@ if __name__=='__main__':
             lr_schedule_G.step()
             lr_schedule_D_N.step()
             lr_schedule_D_V.step()
+            
+            torch.save(G_N2V.state_dict(),'./checkpoint/G_N2V.pth')
+            torch.save(G_V2N.state_dict(),'./checkpoint/G_V2N.pth')
+            torch.save(D_V.state_dict(),'./checkpoint/D_V.pth')
+            torch.save(D_N.state_dict(),'./checkpoint/D_N.pth')
+            torch.save(optimizer_G.state_dict(),'./checkpoint/optimizer_G.pth')
+            torch.save(optimizer_D_V.state_dict(),'./checkpoint/optimizer_D_V.pth')
+            torch.save(optimizer_D_N.state_dict(),'./checkpoint/optimizer_D_N.pth')
+            
             
             
             
