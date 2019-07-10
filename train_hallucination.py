@@ -140,9 +140,9 @@ if __name__=='__main__':
             losses_D_V = AverageMeter()
             losses_D_N = AverageMeter()
 
-            lr_G = LambdaLR(config.train['epochs'], 0.96, config.train['lr_G_decay_epoch'],config.train['lr_G']).step(epoch)
-            lr_D_V = LambdaLR(config.train['epochs'], 0.96, config.train['lr_D_V_decay_epoch'],config.train['lr_D_V']).step(epoch)
-            lr_D_N = LambdaLR(config.train['epochs'], 0.96, config.train['lr_D_N_decay_epoch'],config.train['lr_D_N']).step(epoch)
+            lr_G = LambdaLR(config.train['epochs'], 0.97, config.train['lr_G_decay_epoch'],config.train['lr_G']).step(epoch)
+            lr_D_V = LambdaLR(config.train['epochs'], 0.97, config.train['lr_D_V_decay_epoch'],config.train['lr_D_V']).step(epoch)
+            lr_D_N = LambdaLR(config.train['epochs'], 0.97, config.train['lr_D_N_decay_epoch'],config.train['lr_D_N']).step(epoch)
             
             end_time = time.time()
             
@@ -252,8 +252,8 @@ if __name__=='__main__':
                 time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                 prev_time = time.time()
                 
-                bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.4f} | LR_D_V: {lr_D_V:.4f} | LR_D_N: {lr_D_N:.4f} | ' \
-                             'Loss_G: {loss_G:.4f} | Loss_D_N: {loss_D_N:.4f} | Loss_D_V: {loss_D_V:.4f} | ETA: {time_left}'.format(
+                bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D_V: {lr_D_V:.8f} | LR_D_N: {lr_D_N:.8f} | ' \
+                             'Loss_G: {loss_G:.6f} | Loss_D_N: {loss_D_N:.6f} | Loss_D_V: {loss_D_V:.6f} | ETA: {time_left}'.format(
                     step=i,
                     epoch=epoch,
                     lr_G=lr_G,
@@ -289,10 +289,22 @@ if __name__=='__main__':
             lr_schedule_D_N.step()
             lr_schedule_D_V.step()
             
-            torch.save(G_N2V.state_dict(),'./checkpoint/G_N2V.pth')
-            torch.save(G_V2N.state_dict(),'./checkpoint/G_V2N.pth')
-            torch.save(D_V.state_dict(),'./checkpoint/D_V.pth')
-            torch.save(D_N.state_dict(),'./checkpoint/D_N.pth')
+            torch.save({
+                'state_dict_G_N2V':G_N2V.state_dict(),
+                'epoch_G_N2V':epoch,
+            },'./checkpoint/G_N2V.pth')
+            torch.save({
+                'state_dict_G_V2N':G_V2N.state_dict(),
+                'epoch_G_V2N':epoch
+            },'./checkpoint/G_V2N.pth')
+            torch.save({
+                'state_dict_D_V':D_V.state_dict(),
+                'epoch_D_V':epoch
+            },'./checkpoint/D_V.pth')
+            torch.save({
+                'state_dict_D_N':D_N.state_dict(),
+                'epoch_D_N':epoch
+            },'./checkpoint/D_N.pth')
             torch.save(optimizer_G.state_dict(),'./checkpoint/optimizer_G.pth')
             torch.save(optimizer_D_V.state_dict(),'./checkpoint/optimizer_D_V.pth')
             torch.save(optimizer_D_N.state_dict(),'./checkpoint/optimizer_D_N.pth')
