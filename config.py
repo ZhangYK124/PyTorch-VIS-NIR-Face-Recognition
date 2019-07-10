@@ -3,8 +3,11 @@ train = {}
 train['if_train'] = True
 train['learning_rate'] = 1e-4
 train['epochs'] = 200
-train['batch_size'] = 4
+train['batch_size'] = 6
 train['num_workers'] = 4
+
+train['lambda_cyc_loss'] = 10.0
+train['lambda_id_loss'] = 5.0
 
 train['lr_D_N'] = 1e-3
 train['lr_D_N_decay_epoch'] = 100
