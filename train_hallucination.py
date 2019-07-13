@@ -56,35 +56,76 @@ if __name__=='__main__':
     l1_loss = torch.nn.L1Loss()
     mse_loss = torch.nn.MSELoss()
     cross_entropy = torch.nn.CrossEntropyLoss()
+
+    # Optimizer
+    optimizer_D_N = torch.optim.Adam(D_N.parameters(), lr=config.train['lr_D_N'],
+                                     betas=(config.train['beta1_D_N'], config.train['beta2_D_N']),
+                                     weight_decay=config.train['weight_decay_D_N'])
+    optimizer_D_V = torch.optim.Adam(D_V.parameters(), lr=config.train['lr_D_V'],
+                                     betas=(config.train['beta1_D_V'], config.train['beta2_D_V']),
+                                     weight_decay=config.train['weight_decay_D_V'])
+    # optimizer_G_V2N = torch.optim.Adam(G_V2N.parameters(), lr=config.train['lr_G_V2N'],
+    #                                    betas=(config.train['beta1_G_V2N'], config.train['beta2_G_N2V']),
+    #                                    weight_decay=config.train['weight_decay_G_V2N'])
+    # optimizer_G_N2V = torch.optim.Adam(G_N2V.parameters(), lr=config.train['lr_G_N2V'],
+    #                                    betas=(config.train['beta1_G_N2V'], config.train['beta2_G_N2V']),
+    #                                    weight_decay=config.train['weight_decay_G_N2V'])
+    optimizer_G = torch.optim.Adam(itertools.chain(G_N2V.parameters(), G_V2N.parameters()), lr=config.train['lr_G'],
+                                   betas=(config.train['beta1_G'], config.train['beta2_G']),
+                                   weight_decay=config.train['weight_decay_G'])
     
     if config.train['resume_G_N2V']:
         checkpoint = torch.load(config.train['resume_G_N2V'])
-        G_N2V.load_state_dict(checkpoint['state_dict'])
-        start_epoch = checkpoint['epoch']
+        G_N2V.load_state_dict(checkpoint['state_dict_G_N2V'])
+        start_epoch = checkpoint['epoch_G_N2V']
+        optim_checkpoint = torch.load(config.train['resume_optim_G'])
+        optimizer_G.load_state_dict(optim_checkpoint)
     else:
         G_N2V.apply(weights_init)
         start_epoch = 0
 
     if config.train['resume_G_V2N']:
         checkpoint = torch.load(config.train['resume_G_V2N'])
-        G_V2N.load_state_dict(checkpoint['state_dict'])
-        start_epoch = checkpoint['epoch']
+        G_V2N.load_state_dict(checkpoint['state_dict_G_V2N'])
+        start_epoch = checkpoint['epoch_G_V2N']
+        optim_checkpoint = torch.load(config.train['resume_optim_G'])
+        optimizer_G.load_state_dict(optim_checkpoint)
+        for state in optimizer_G.state.values():
+            for k,v in state.items():
+                if isinstance(v,torch.Tensor):
+                    state[k] = v.cuda()
     else:
         G_V2N.apply(weights_init)
         start_epoch = 0
 
     if config.train['resume_D_V']:
         checkpoint = torch.load(config.train['resume_D_V'])
-        G_V2N.load_state_dict(checkpoint['state_dict'])
-        start_epoch = checkpoint['epoch']
+        D_V.load_state_dict(checkpoint['state_dict_D_V'])
+        start_epoch = checkpoint['epoch_D_V']
+
+        optim_checkpoint = torch.load(config.train['resume_optim_D_V'])
+        optimizer_D_V.load_state_dict(optim_checkpoint)
+        
+        for state in optimizer_D_V.state.values():
+            for k,v in state.items():
+                if isinstance(v,torch.Tensor):
+                    state[k] = v.cuda()
     else:
         D_V.apply(weights_init)
         start_epoch = 0
 
     if config.train['resume_D_N']:
         checkpoint = torch.load(config.train['resume_D_N'])
-        G_V2N.load_state_dict(checkpoint['state_dict'])
-        start_epoch = checkpoint['epoch']
+        D_N.load_state_dict(checkpoint['state_dict_D_N'])
+        start_epoch = checkpoint['epoch_D_N']
+
+        optim_checkpoint = torch.load(config.train['resume_optim_D_N'])
+        optimizer_D_N.load_state_dict(optim_checkpoint)
+        
+        for state in optimizer_D_N.state.values():
+            for k,v in state.items():
+                if isinstance(v,torch.Tensor):
+                    state[k] = v.cuda()
     else:
         D_N.apply(weights_init)
         start_epoch = 0
@@ -98,20 +139,11 @@ if __name__=='__main__':
         mse_loss.cuda()
         cross_entropy.cuda()
     
-    # Optimizer
-    optimizer_D_N = torch.optim.Adam(D_N.parameters(),lr=config.train['lr_D_N'],betas=(config.train['beta1_D_N'],config.train['beta2_D_N']),weight_decay=config.train['weight_decay_D_N'])
-    optimizer_D_V = torch.optim.Adam(D_V.parameters(),lr=config.train['lr_D_V'],betas=(config.train['beta1_D_V'],config.train['beta2_D_V']),weight_decay=config.train['weight_decay_D_V'])
-    optimizer_G_V2N = torch.optim.Adam(G_V2N.parameters(),lr=config.train['lr_G_V2N'],betas=(config.train['beta1_G_V2N'],config.train['beta2_G_N2V']),weight_decay=config.train['weight_decay_G_V2N'])
-    optimizer_G_N2V = torch.optim.Adam(G_N2V.parameters(),lr=config.train['lr_G_N2V'],betas=(config.train['beta1_G_N2V'],config.train['beta2_G_N2V']),weight_decay=config.train['weight_decay_G_N2V'])
-    optimizer_G = torch.optim.Adam(itertools.chain(G_N2V.parameters(),G_V2N.parameters()),lr=config.train['lr_G'],betas=(config.train['beta1_G'],config.train['beta2_G']),weight_decay=config.train['weight_decay_G'])
-    
     # LR Schedulers
-    lr_schedule_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G,lr_lambda=LambdaLR(config.train['epochs'],0.998,config.train['lr_G_decay_epoch'],config.train['lr_G']).step)
-    lr_schedule_D_V = torch.optim.lr_scheduler.LambdaLR(optimizer_D_V,lr_lambda=LambdaLR(config.train['epochs'],0.998,config.train['lr_D_V_decay_epoch'],config.train['lr_D_V']).step)
-    lr_schedule_D_N = torch.optim.lr_scheduler.LambdaLR(optimizer_D_N,lr_lambda=LambdaLR(config.train['epochs'],0.998,config.train['lr_D_N_decay_epoch'],config.train['lr_D_N']).step)
+    lr_schedule_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G,lr_lambda=LambdaLR(config.train['epochs'],config.train['lr_G_decay_rate'],config.train['lr_G_decay_epoch'],config.train['lr_G']).step)
+    lr_schedule_D_V = torch.optim.lr_scheduler.LambdaLR(optimizer_D_V,lr_lambda=LambdaLR(config.train['epochs'],config.train['lr_D_V_decay_rate'],config.train['lr_D_V_decay_epoch'],config.train['lr_D_V']).step)
+    lr_schedule_D_N = torch.optim.lr_scheduler.LambdaLR(optimizer_D_N,lr_lambda=LambdaLR(config.train['epochs'],config.train['lr_D_N_decay_rate'],config.train['lr_D_N_decay_epoch'],config.train['lr_D_N']).step)
     
-    
-
         
     target_real = Variable(torch.cuda.FloatTensor(config.train['batch_size']).fill_(1.0),requires_grad=False)
     target_fake = Variable(torch.cuda.FloatTensor(config.train['batch_size']).fill_(0.0),requires_grad=False)
@@ -135,6 +167,8 @@ if __name__=='__main__':
             batch_time = AverageMeter()
             data_time = AverageMeter()
             losses_G = AverageMeter()
+            cycle_losses = AverageMeter()
+            intensity_losses = AverageMeter()
             losses_G_V2N = AverageMeter()
             losses_G_N2V = AverageMeter()
             losses_D_V = AverageMeter()
@@ -157,7 +191,7 @@ if __name__=='__main__':
                 real_vis_left_eye = batch['vis_left_eye']
                 real_vis_right_eye = batch['vis_right_eye']
                 real_nir_left_eye = batch['nir_left_eye']
-                real_nir_right_eye = batch['nir_left_eye']
+                real_nir_right_eye = batch['nir_right_eye']
                 
                 # ################### Train G ###################
                 optimizer_G.zero_grad()
@@ -172,13 +206,19 @@ if __name__=='__main__':
                 pred_fake_nir = D_N(fake_nir)
                 pred_fake_nir_local = D_N(fake_local_nir)
                 loss_G_V2N = mse_loss(pred_fake_nir,target_real) + mse_loss(pred_fake_nir_local,target_real)
+                loss_G_total = loss_G_V2N+loss_G_N2V
+                
+                # Intensity Loss
+                intensity_loss = (l1_loss(rgb2ycbcr(fake_vis),real_nir[:,0,:,:]) + l1_loss(fake_nir[:,0,:,:],rgb2ycbcr(real_vis))) * config.train['lambda_in_loss']
+                
                 
                 # Identity Loss
-                identity_fake_nir, identity_fake_local_nir, identity_real_local_nir, identity_fake_local_nir_left_eye, identity_fake_local_nir_right_eye = G_V2N(real_nir, real_nir_left_eye, real_nir_right_eye)
-                identity_fake_vis, identity_fake_local_vis, identity_real_local_vis, identity_fake_local_vis_left_eye, identity_fake_local_vis_right_eye = G_N2V(real_vis,real_vis_left_eye, real_vis_right_eye)
-                identity_loss_G_V2N = l1_loss(identity_fake_vis,real_vis) + l1_loss(identity_fake_local_vis_left_eye,real_vis_left_eye) + l1_loss(identity_fake_local_vis_right_eye,real_nir_right_eye)
-                identity_loss_G_N2V = l1_loss(identity_fake_nir,real_nir) + l1_loss(identity_fake_local_nir_left_eye,real_nir_left_eye) + l1_loss(identity_fake_local_nir_right_eye,real_nir_right_eye)
-                identity_loss = identity_loss_G_V2N + identity_loss_G_N2V
+                # identity_fake_nir, identity_fake_local_nir, identity_real_local_nir, identity_fake_local_nir_left_eye, identity_fake_local_nir_right_eye = G_V2N(real_nir, real_nir_left_eye, real_nir_right_eye)
+                # identity_fake_vis, identity_fake_local_vis, identity_real_local_vis, identity_fake_local_vis_left_eye, identity_fake_local_vis_right_eye = G_N2V(real_vis,real_vis_left_eye, real_vis_right_eye)
+                # identity_loss_G_V2N = l1_loss(identity_fake_vis,real_vis) + l1_loss(identity_fake_local_vis,identity_real_local_vis)
+                # identity_loss_G_N2V = l1_loss(identity_fake_nir,real_nir) + l1_loss(identity_fake_local_nir,identity_real_local_nir)
+                # identity_loss = (identity_loss_G_V2N + identity_loss_G_N2V)* config.train['lambda_id_loss']
+                # identity_loss = torch.Tensor(np.array([0.])).cuda()
                 
                 # Cycle Loss
                 recovered_nir,recovered_local_nir,_,recovered_local_nir_left_eye,recovered_local_nir_right_eye = G_V2N(fake_vis,fake_local_vis_left_eye,fake_local_vis_right_eye)
@@ -187,59 +227,63 @@ if __name__=='__main__':
                 recovered_vis,recovered_local_vis,_,recovered_local_vis_left_eye,recovered_local_vis_right_eye = G_N2V(fake_nir,fake_local_nir_left_eye,fake_local_nir_right_eye)
                 cycle_loss_VNV = l1_loss(recovered_vis,real_vis) + l1_loss(recovered_local_vis,real_local_vis)
                 
-                cycle_loss = cycle_loss_NVN + cycle_loss_VNV
+                cycle_loss = (cycle_loss_NVN + cycle_loss_VNV) * config.train['lambda_cyc_loss']
                 
                 # Total Loss
-                loss_G = loss_G_N2V + loss_G_V2N + cycle_loss * config.train['lambda_cyc_loss'] + identity_loss * config.train['lambda_id_loss']
+                # loss_G = loss_G_N2V + loss_G_V2N + cycle_loss  + identity_loss
+                loss_G = loss_G_total  + cycle_loss + intensity_loss
                 
                 loss_G.backward()
                 optimizer_G.step()
                 # #####################################################
                 
-                # ##################### Train D_V #####################
-                optimizer_D_V.zero_grad()
-                
-                # Real Loss
-                pred_real_vis = D_V(real_vis)
-                pred_real_local_vis = D_V(real_local_vis)
-                loss_D_V_real = mse_loss(pred_real_vis,target_real) + mse_loss(pred_real_local_vis,target_real)
-                
-                # Fake Loss
-                fake_vis = fake_vis_buffer.push_and_pop(fake_vis)
-                fake_local_vis = fake_local_vis_buffer.push_and_pop(fake_local_vis)
-                pred_fake_vis = D_V(fake_vis.detach())
-                pred_fake_local_vis = D_V(fake_local_vis.detach())
-                loss_D_V_fake = mse_loss(pred_fake_vis,target_fake) + mse_loss(pred_fake_local_vis,target_fake)
-                
-                # Total Loss
-                loss_D_V = loss_D_V_real + loss_D_V_fake
-                loss_D_V.backward()
-                optimizer_D_V.step()
-                # #######################################################
-                
-                # ########################### Train D_N #############################
-                optimizer_D_N.zero_grad()
-                
-                # Real Loss
-                pred_real_nir = D_N(real_nir)
-                pred_real_local_nir = D_N(real_local_nir)
-                loss_D_real = mse_loss(pred_real_nir,target_real) + mse_loss(pred_real_local_nir,target_real)
-                
-                # Fake Loss
-                fake_nir = fake_nir_buffer.push_and_pop(fake_nir)
-                fake_local_nir = fake_local_vis_buffer.push_and_pop(fake_local_nir)
-                pred_fake_nir = D_N(fake_nir.detach())
-                pred_fake_local_nir = D_N(fake_local_nir.detach())
-                loss_D_fake = mse_loss(pred_fake_nir,target_fake) + mse_loss(pred_fake_local_nir,target_fake)
-                
-                # Total Loss
-                loss_D_N = loss_D_real + loss_D_fake
-                loss_D_N.backward()
-                optimizer_D_N.step()
-                # ##########################################################
+                if i%config.train['dis_steps']==0:
+                    # ##################### Train D_V #####################
+                    optimizer_D_V.zero_grad()
+                    
+                    # Real Loss
+                    pred_real_vis = D_V(real_vis)
+                    pred_real_local_vis = D_V(real_local_vis)
+                    loss_D_V_real = mse_loss(pred_real_vis,target_real) + mse_loss(pred_real_local_vis,target_real)
+                    
+                    # Fake Loss
+                    fake_vis = fake_vis_buffer.push_and_pop(fake_vis)
+                    fake_local_vis = fake_local_vis_buffer.push_and_pop(fake_local_vis)
+                    pred_fake_vis = D_V(fake_vis.detach())
+                    pred_fake_local_vis = D_V(fake_local_vis.detach())
+                    loss_D_V_fake = mse_loss(pred_fake_vis,target_fake) + mse_loss(pred_fake_local_vis,target_fake)
+                    
+                    # Total Loss
+                    loss_D_V = loss_D_V_real + loss_D_V_fake
+                    loss_D_V.backward()
+                    optimizer_D_V.step()
+                    # #######################################################
+                    
+                    # ########################### Train D_N #############################
+                    optimizer_D_N.zero_grad()
+                    
+                    # Real Loss
+                    pred_real_nir = D_N(real_nir)
+                    pred_real_local_nir = D_N(real_local_nir)
+                    loss_D_real = mse_loss(pred_real_nir,target_real) + mse_loss(pred_real_local_nir,target_real)
+                    
+                    # Fake Loss
+                    fake_nir = fake_nir_buffer.push_and_pop(fake_nir)
+                    fake_local_nir = fake_local_vis_buffer.push_and_pop(fake_local_nir)
+                    pred_fake_nir = D_N(fake_nir.detach())
+                    pred_fake_local_nir = D_N(fake_local_nir.detach())
+                    loss_D_fake = mse_loss(pred_fake_nir,target_fake) + mse_loss(pred_fake_local_nir,target_fake)
+                    
+                    # Total Loss
+                    loss_D_N = loss_D_real + loss_D_fake
+                    loss_D_N.backward()
+                    optimizer_D_N.step()
+                    # ##########################################################
                 
                 # ######################## Plot Progress ###########################
-                losses_G.update(loss_G.data.cpu().numpy(),config.train['batch_size'])
+                losses_G.update(loss_G_total.data.cpu().numpy(),config.train['batch_size'])
+                cycle_losses.update(cycle_loss.data.cpu().numpy(),config.train['batch_size'])
+                intensity_losses.update(intensity_loss.data.cpu().numpy(),config.train['batch_size'])
                 losses_D_N.update(loss_D_N.data.cpu().numpy(),config.train['batch_size'])
                 losses_D_V.update(loss_D_V.data.cpu().numpy(),config.train['batch_size'])
                 
@@ -253,16 +297,18 @@ if __name__=='__main__':
                 prev_time = time.time()
                 
                 bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D_V: {lr_D_V:.8f} | LR_D_N: {lr_D_N:.8f} | ' \
-                             'Loss_G: {loss_G:.6f} | Loss_D_N: {loss_D_N:.6f} | Loss_D_V: {loss_D_V:.6f} | ETA: {time_left}'.format(
+                             'Loss_G: {loss_G:.6f} | Cycle Loss: {cycle_loss:.6f} | In Loss: {in_loss:.6f} | Loss_D_N: {loss_D_N:.6f} | Loss_D_V: {loss_D_V:.6f} | ETA: {time_left}'.format(
                     step=i,
                     epoch=epoch,
                     lr_G=lr_G,
                     lr_D_V=lr_D_V,
                     lr_D_N=lr_D_N,
                     loss_G=losses_G.avg,
+                    cycle_loss=cycle_losses.avg,
+                    in_loss=intensity_losses.avg,
                     loss_D_N=losses_D_N.avg,
                     loss_D_V=losses_D_V.avg,
-                    time_left=time_left
+                    time_left=time_left,
                 )
                 print(bar.suffix)
                 # Save Image
@@ -283,31 +329,45 @@ if __name__=='__main__':
                     fake_local_nir_single = fake_local_nir.detach().cpu().numpy()[0]
                     fake_local_nir_single_name = 'fake_local_nir_{}_{}.png'.format(epoch,i//count)
                     save_image_single(fake_local_nir_single, './out/' + fake_local_nir_single_name, 112)
+                    
+                    real_nir_single = real_nir.detach().cpu().numpy()[0]
+                    real_nir_single_name = 'real_nir_{}_{}.png'.format(epoch,i//count)
+                    save_image_single(real_nir_single,'./out/'+real_nir_single_name,112)
+                    
+                    real_vis_single = real_vis.detach().cpu().numpy()[0]
+                    real_vis_single_name = 'real_vis_{}_{}.png'.format(epoch,i//count)
+                    save_image_single(real_vis_single,'./out/'+real_vis_single_name,112)
+                    
+                    # fake_local_vis_right_eye_single = fake_local_vis_right_eye.detach().cpu().numpy()[0]
+                    # fake_local_vis_right_eye_single_name = 'fake_local_vis_right_eye_{}_{}.png'.format(epoch,i//count)
+                    # save_image_single(fake_local_vis_right_eye_single,'./out/'+fake_local_vis_right_eye_single_name)
               
             
             lr_schedule_G.step()
             lr_schedule_D_N.step()
             lr_schedule_D_V.step()
             
+            date = '20190713_no_id'
+            
             torch.save({
                 'state_dict_G_N2V':G_N2V.state_dict(),
                 'epoch_G_N2V':epoch,
-            },'./checkpoint/G_N2V.pth')
+            },'./checkpoint/G_N2V_'+date+'.pth')
             torch.save({
                 'state_dict_G_V2N':G_V2N.state_dict(),
                 'epoch_G_V2N':epoch
-            },'./checkpoint/G_V2N.pth')
+            },'./checkpoint/G_V2N_'+date+'.pth')
             torch.save({
                 'state_dict_D_V':D_V.state_dict(),
                 'epoch_D_V':epoch
-            },'./checkpoint/D_V.pth')
+            },'./checkpoint/D_V_'+date+'.pth')
             torch.save({
                 'state_dict_D_N':D_N.state_dict(),
                 'epoch_D_N':epoch
-            },'./checkpoint/D_N.pth')
-            torch.save(optimizer_G.state_dict(),'./checkpoint/optimizer_G.pth')
-            torch.save(optimizer_D_V.state_dict(),'./checkpoint/optimizer_D_V.pth')
-            torch.save(optimizer_D_N.state_dict(),'./checkpoint/optimizer_D_N.pth')
+            },'./checkpoint/D_N_'+date+'.pth')
+            torch.save(optimizer_G.state_dict(),'./checkpoint/optimizer_G_'+date+'.pth')
+            torch.save(optimizer_D_V.state_dict(),'./checkpoint/optimizer_D_V_'+date+'.pth')
+            torch.save(optimizer_D_N.state_dict(),'./checkpoint/optimizer_D_N_'+date+'.pth')
             
             
             

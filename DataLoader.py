@@ -37,7 +37,8 @@ class Dataset(data.Dataset):
     def __getitem__(self, index):
         vis_img = Image.open(os.path.join(self.vis_root,self.vis_img_list[index],self.vis_img_list[index]+'.jpg'))
         
-        nir_name = choice(self.nir_img_list)
+        # nir_name = choice(self.nir_img_list)
+        nir_name = self.nir_img_list[index]
         nir_img = Image.open(os.path.join(self.nir_root,nir_name,nir_name+'.jpg'))
         nir_img = nir_img.convert("RGB")
         
