@@ -1,6 +1,10 @@
 import torch
 import numpy as np
 
+import tensorflow as tf
+import tensorboardX
+from tensorboardX import SummaryWriter
+
 import torch.nn as nn
 import math
 import torch.nn.functional as F
@@ -157,6 +161,7 @@ if __name__ == '__main__':
     model = Discriminator().cuda()
     # model = Generator().cuda()
     input = Variable(torch.rand(3,3,112,112)).cuda()
+    writter = SummaryWriter('./log')
     output = model(input)
     print(model(input)[0].size())
         
