@@ -336,6 +336,13 @@ def save_image_single(x, path, imsize=512):
     # im = Image.fromarray(ndarr)
     # im = im.resize((imsize,imsize), Image.NEAREST)
     # im.save(path)
+    
+def rgb2ycbcr(x):
+    y = x.clone()
+    y[:, 0, :, :] = x[:, 0, :, :] * 0.257 + x[:, 1, :, :] * 0.564 + x[:, 2, :, :] * 0.098 + 16/256.0
+    y[:, 1, :, :] = x[:, 0, :, :] * (-0.148) - x[:, 1, :, :] * 0.291 + x[:, 2, :, :] * 0.439 + 128/256.0
+    y[:, 2, :, :] = x[:, 0, :, :] * 0.439 - x[:, 1, :, :] * 0.268 - x[:, 2, :, :] * 0.071 + 128/256.0
+    return y[:,0,:,:]
 
 
 def save_image_grid(x, path, imsize=512, ngrid=4):
