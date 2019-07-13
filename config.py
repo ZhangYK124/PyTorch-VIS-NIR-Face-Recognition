@@ -44,23 +44,23 @@ train['weight_decay_G'] = 1e-5
 # train['beta2_G_V2N'] = 0.999
 # train['weight_decay_G_V2N'] = 1e-5
 
-train['resume_G_N2V'] = None
-train['resume_G_V2N'] = None
-train['resume_D_N'] = None
-train['resume_D_V'] = None
-
-train['resume_optim_G'] = None
-train['resume_optim_D_V'] = None
-train['resume_optim_D_N'] = None
-
-# train['resume_G_N2V'] = 'checkpoint/G_N2V_20190712_no_id.pth'
-# train['resume_G_V2N'] = 'checkpoint/G_V2N_20190712_no_id.pth'
-# train['resume_D_N'] = 'checkpoint/D_N_20190712_no_id.pth'
-# train['resume_D_V'] = 'checkpoint/D_V_20190712_no_id.pth'
+# train['resume_G_N2V'] = None
+# train['resume_G_V2N'] = None
+# train['resume_D_N'] = None
+# train['resume_D_V'] = None
 #
-# train['resume_optim_G'] = 'checkpoint/optimizer_G_20190712_no_id.pth'
-# train['resume_optim_D_V'] = 'checkpoint/optimizer_D_V_20190712_no_id.pth'
-# train['resume_optim_D_N'] = 'checkpoint/optimizer_D_N_20190712_no_id.pth'
+# train['resume_optim_G'] = None
+# train['resume_optim_D_V'] = None
+# train['resume_optim_D_N'] = None
+
+train['resume_G_N2V'] = 'checkpoint/G_N2V_20190713_no_id.pth'
+train['resume_G_V2N'] = 'checkpoint/G_V2N_20190713_no_id.pth'
+train['resume_D_N'] = 'checkpoint/D_N_20190713_no_id.pth'
+train['resume_D_V'] = 'checkpoint/D_V_20190713_no_id.pth'
+
+train['resume_optim_G'] = 'checkpoint/optimizer_G_20190713_no_id.pth'
+train['resume_optim_D_V'] = 'checkpoint/optimizer_D_V_20190713_no_id.pth'
+train['resume_optim_D_N'] = 'checkpoint/optimizer_D_N_20190713_no_id.pth'
 
 train['random_seed'] = None
 

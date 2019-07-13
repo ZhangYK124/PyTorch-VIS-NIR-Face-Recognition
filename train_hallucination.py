@@ -10,6 +10,7 @@ from torch.autograd import Variable
 import itertools
 from tqdm import tqdm as tqdm
 import datetime
+from tensorboardX import SummaryWriter
 
 from utils import *
 import config
@@ -156,9 +157,17 @@ if __name__=='__main__':
     prev_time = time.time()
 
     count = int(len(trainLoader) // 4)
+    writer_loss_G_epochs = SummaryWriter('./logs/epochs/loss_G')
+    writer_in_loss_epochs = SummaryWriter('./logs/epochs/in_loss')
+    writer_cycle_loss_epochs = SummaryWriter('./logs/epochs/cycle_loss')
+    
     # Training
     if config.train['if_train']:
         for epoch in range(start_epoch,config.train['epochs']):
+            writer_loss_G_steps = SummaryWriter('./logs/steps/loss_G')
+            writer_in_loss_steps = SummaryWriter('./logs/steps/in_loss')
+            writer_cycle_loss_steps = SummaryWriter('./logs/steps/cycle_loss')
+            
             D_V.train()
             D_N.train()
             G_V2N.train()
@@ -311,8 +320,13 @@ if __name__=='__main__':
                     time_left=time_left,
                 )
                 print(bar.suffix)
-                # Save Image
                 
+                # SummaryWriter
+                writer_loss_G_steps.add_scalar('steps/steps_loss_G',losses_G.avg,i)
+                writer_cycle_loss_steps.add_scalar('steps/steps_cycle_loss',cycle_losses.avg,i)
+                writer_in_loss_steps.add_scalar('steps/steps_in_loss',intensity_losses.avg,i)
+                
+                # Save Image
                 if i%count==0:
                     fake_nir_single = fake_nir.detach().cpu().numpy()[0]
                     fake_nir_single_name = 'fake_nir_{}_{}.png'.format(epoch,i//count)
@@ -341,7 +355,11 @@ if __name__=='__main__':
                     # fake_local_vis_right_eye_single = fake_local_vis_right_eye.detach().cpu().numpy()[0]
                     # fake_local_vis_right_eye_single_name = 'fake_local_vis_right_eye_{}_{}.png'.format(epoch,i//count)
                     # save_image_single(fake_local_vis_right_eye_single,'./out/'+fake_local_vis_right_eye_single_name)
-              
+
+            # SummaryWriter
+            writer_loss_G_epochs.add_scalar('epochs/loss_G', losses_G.avg, epoch)
+            writer_cycle_loss_epochs.add_scalar('epochs/in_loss', cycle_losses.avg,epoch)
+            writer_in_loss_epochs.add_scalar('epochs/cycle_loss', intensity_losses.avg,epoch)
             
             lr_schedule_G.step()
             lr_schedule_D_N.step()
