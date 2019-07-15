@@ -1,6 +1,6 @@
 # VIS-NIR Face Recognition, in PyTorch
 
-## Update Version
+## Update Logs
 
 ### 201907151736
     - batch_size = 1,which is same as cyclegan.
