@@ -24,14 +24,16 @@ class _Residual_Block(nn.Module):
         self.bn1 = nn.BatchNorm2d(out_channels)
         # self.batch_channel = int(160*out_channels/64)
         # self.in1 = nn.InstanceNorm2d(self.batch_channel, affine=True)
-        self.relu = nn.PReLU(out_channels)
+        # self.relu = nn.PReLU(out_channels)
+        self.relu = nn.LeakyReLU(0.1)
         self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1,
                                bias=False)
         # self.conv2 = OctConv(ch_in=in_channels, ch_out=out_channels, kernel_size=3, stride=1, alphas=(0.5, 0))
         self.in2 = nn.InstanceNorm2d(out_channels, affine=True)
         self.bn2 = nn.BatchNorm2d(out_channels)
-        self.relu_out = nn.PReLU(out_channels)
-    
+        # self.relu_out = nn.PReLU(out_channels)
+        self.relu_out = nn.LeakyReLU(0.1)
+        
     def forward(self, x):
         identity_data = x
         out = self.conv1(x)
@@ -39,7 +41,7 @@ class _Residual_Block(nn.Module):
         out = self.conv2(out)
         out = self.in2(out)
         out = torch.add(out, identity_data)
-        out = self.relu_out(out)
+        # out = self.relu_out(out)
         return out
     
 class LocalPathWay(nn.Module):
@@ -105,9 +107,9 @@ class GlobalPathWay(nn.Module):
     def forward(self, I112,local_feature):
         out = self.conv_in(I112)
         out = self.residual6_1(out)
-        # out = self.residual6_2(out)
+        out = self.residual6_2(out)
         out = torch.cat([out,local_feature],dim=1)
-        out = self.residual3(out)
+        # out = self.residual3(out)
         out = self.instance(out)
         out = self.conv_out(out)
         return out
@@ -153,7 +155,7 @@ class Discriminator(nn.Module):
     def forward(self, x):
         out = self.conv(x)
         out = self.residual3(out)
-        out = self.instance(out)
+        out = self.bn(out)
         out = self.conv_out(out)
         return F.avg_pool2d(out,out.size()[2:]).view(out.size()[0],-1)
     
@@ -161,7 +163,7 @@ if __name__ == '__main__':
     model = Discriminator().cuda()
     # model = Generator().cuda()
     input = Variable(torch.rand(3,3,112,112)).cuda()
-    writter = SummaryWriter('./log')
+    # writter = SummaryWriter('./log')
     output = model(input)
     print(model(input)[0].size())
         
