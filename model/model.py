@@ -89,13 +89,13 @@ class LocalFuser(nn.Module):
 class GlobalPathWay(nn.Module):
     def __init__(self):
         super(GlobalPathWay,self).__init__()
-        self.conv_in = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
-        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=64, out_channel=64)
-        self.residual6_2 = self.make_layer(_Residual_Block,6,in_channel=64,out_channel=64)
+        self.conv_in = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=3,stride=1,padding=1,bias=False)
+        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128)
+        self.residual6_2 = self.make_layer(_Residual_Block,6,in_channel=128,out_channel=128)
         self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=128, out_channel=128)
         self.bn = nn.BatchNorm2d(128,affine=True)
-        self.instance = nn.InstanceNorm2d(128,affine=True)
-        self.conv_out = nn.Conv2d(in_channels=128,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.instance = nn.InstanceNorm2d(194,affine=True)
+        self.conv_out = nn.Conv2d(in_channels=194,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
 
         
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
@@ -108,9 +108,10 @@ class GlobalPathWay(nn.Module):
         out = self.conv_in(I112)
         out = self.residual6_1(out)
         out = self.residual6_2(out)
+        out = self.instance(out)
         out = torch.cat([out,local_feature],dim=1)
         # out = self.residual3(out)
-        out = self.instance(out)
+        # out = self.instance(out)
         out = self.conv_out(out)
         return out
     
