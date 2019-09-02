@@ -1,10 +1,6 @@
 import torch
 import numpy as np
 
-import tensorflow as tf
-import tensorboardX
-from tensorboardX import SummaryWriter
-
 import torch.nn as nn
 import math
 import torch.nn.functional as F
@@ -14,10 +10,10 @@ import pdb
 
 
 class _Residual_Block(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels,kernel_size=3,stride=1,padding=1):
         super(_Residual_Block, self).__init__()
         
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1,
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding,
                                bias=False)
         # self.conv1 = OctConv(ch_in=in_channels,ch_out=out_channels,kernel_size=3,stride=1,alphas=(0,0.5))
         self.in1 = nn.InstanceNorm2d(out_channels, affine=True)
@@ -26,7 +22,7 @@ class _Residual_Block(nn.Module):
         # self.in1 = nn.InstanceNorm2d(self.batch_channel, affine=True)
         # self.relu = nn.PReLU(out_channels)
         self.relu = nn.LeakyReLU(0.1)
-        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1,
+        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding,
                                bias=False)
         # self.conv2 = OctConv(ch_in=in_channels, ch_out=out_channels, kernel_size=3, stride=1, alphas=(0.5, 0))
         self.in2 = nn.InstanceNorm2d(out_channels, affine=True)
@@ -52,6 +48,7 @@ class LocalPathWay(nn.Module):
         self.bn = nn.BatchNorm2d(64,affine=True)
         self.instance = nn.InstanceNorm2d(64,affine=True)
         self.conv_out = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.out = nn.Tanh()
 
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
         layers = []
@@ -65,8 +62,9 @@ class LocalPathWay(nn.Module):
         out = self.residual(out)
         out_feature = self.instance(out)
         local_img = self.conv_out(out_feature)
+        local_img = self.out(local_img)
         return out_feature, local_img
-    
+        # return local_img
 class LocalFuser(nn.Module):
     '''
     Landmark coordinate:
@@ -90,29 +88,34 @@ class GlobalPathWay(nn.Module):
     def __init__(self):
         super(GlobalPathWay,self).__init__()
         self.conv_in = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=3,stride=1,padding=1,bias=False)
-        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128)
-        self.residual6_2 = self.make_layer(_Residual_Block,6,in_channel=128,out_channel=128)
-        self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=128, out_channel=128)
+        self.residual6_1 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128,kernel_size=7,padding=3,stride=1)
+        self.residual6_2 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128,kernel_size=7,padding=3,stride=1)
+        self.residual = self.make_layer(_Residual_Block, 1, in_channel=192, out_channel=192,kernel_size=7,padding=3,stride=1)
         self.bn = nn.BatchNorm2d(128,affine=True)
-        self.instance = nn.InstanceNorm2d(194,affine=True)
-        self.conv_out = nn.Conv2d(in_channels=194,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.bn_out = nn.BatchNorm2d(192, affine=True)
+        self.in_out = nn.InstanceNorm2d(192, affine=True)
+        self.instance = nn.InstanceNorm2d(128,affine=True)
+        self.conv_out = nn.Conv2d(in_channels=192,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.out = nn.Tanh()
 
         
-    def make_layer(self, block, num_of_layer,in_channel, out_channel):
+    def make_layer(self, block, num_of_layer,in_channel, out_channel,kernel_size,stride,padding):
         layers = []
         for _ in range(num_of_layer):
-            layers.append(block(in_channel,out_channel))
+            layers.append(block(in_channel,out_channel,kernel_size,stride,padding))
         return nn.Sequential(*layers)
         
     def forward(self, I112,local_feature):
         out = self.conv_in(I112)
         out = self.residual6_1(out)
-        out = self.residual6_2(out)
+        # out = self.residual6_2(out)
         out = self.instance(out)
         out = torch.cat([out,local_feature],dim=1)
-        # out = self.residual3(out)
-        # out = self.instance(out)
+        # out = self.residual(out)
+        # out = self.conv_out(out)
+        # out = self.in_out(out)
         out = self.conv_out(out)
+        out = self.out(out)
         return out
     
 class Generator(nn.Module):

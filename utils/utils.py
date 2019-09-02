@@ -331,19 +331,38 @@ def save_image_single(x, path, imsize=512):
     from PIL import Image
     # grid = make_image_grid(x, 1)
     # ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).numpy()
-    image = m.toimage(x)
+    image = m.toimage(x,cmin=None,cmax=None)
     image.save(path)
     # im = Image.fromarray(ndarr)
     # im = im.resize((imsize,imsize), Image.NEAREST)
     # im.save(path)
     
-def rgb2ycbcr(x):
+def denorm(x):
+    return x * 0.5 + 0.5
+
+def tensor2numpy(x):
+    return x.transpose(1,2,0)
+
+def RGB2BGR(x):
+    import cv2
+    return cv2.cvtColor(x, cv2.COLOR_RGB2BGR)
+    
+def rgb2ycbcr(x1):
+    x = (x1/2.0+0.5)*255.0
     y = x.clone()
-    y[:, 0, :, :] = x[:, 0, :, :] * 0.257 + x[:, 1, :, :] * 0.564 + x[:, 2, :, :] * 0.098 + 16/256.0
-    y[:, 1, :, :] = x[:, 0, :, :] * (-0.148) - x[:, 1, :, :] * 0.291 + x[:, 2, :, :] * 0.439 + 128/256.0
-    y[:, 2, :, :] = x[:, 0, :, :] * 0.439 - x[:, 1, :, :] * 0.268 - x[:, 2, :, :] * 0.071 + 128/256.0
+    y[:, 0, :, :] = x[:, 0, :, :] * 0.257 + x[:, 1, :, :] * 0.564 + x[:, 2, :, :] * 0.098 + 16
+    y[:, 1, :, :] = x[:, 0, :, :] * (-0.148) - x[:, 1, :, :] * 0.291 + x[:, 2, :, :] * 0.439 + 128
+    y[:, 2, :, :] = x[:, 0, :, :] * 0.439 - x[:, 1, :, :] * 0.268 - x[:, 2, :, :] * 0.071 + 128
     return y[:,0,:,:]
 
+def cam(x, size = 112):
+    import cv2
+    x = x - np.min(x)
+    cam_img = x / np.max(x)
+    cam_img = np.uint8(255 * cam_img)
+    cam_img = cv2.resize(cam_img, (size, size))
+    cam_img = cv2.applyColorMap(cam_img, cv2.COLORMAP_JET)
+    return cam_img / 255.0
 
 def save_image_grid(x, path, imsize=512, ngrid=4):
     from PIL import Image
