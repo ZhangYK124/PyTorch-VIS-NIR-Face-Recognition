@@ -232,8 +232,9 @@ def _preprocess(img):
     Returns:
         a float numpy array of shape [1, c, h, w].
     """
+    # img = np.expand_dims(img, 0)
     img = img.transpose((2, 0, 1))
-    # img = np.expand_dims(img,0)
+    
     img = np.expand_dims(img, 0)
     img = (img - 127.5) * 0.0078125
     return img

@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.utils.data as data
 from torchvision import transforms
 from torch.autograd import Variable
+import cv2
 
 import itertools
 from tqdm import tqdm as tqdm
@@ -16,7 +17,7 @@ from utils import *
 import config
 from DataLoader import Dataset
 
-from model.model import Discriminator, Generator, GlobalPathWay, LocalPathWay
+from model.model_CAM import Discriminator, Generator, GlobalPathWay, LocalPathWay
 
 
 def weights_init(m):
@@ -28,9 +29,9 @@ def weights_init(m):
         elif isinstance(each, nn.BatchNorm2d):
             each.weight.data.fill_(1)
             each.bias.data.zero_()
-        elif isinstance(each, nn.Linear):
-            nn.init.xavier_uniform_(each.weight.data)
-            each.bias.data.zero_()
+        # elif isinstance(each, nn.Linear):
+        #     nn.init.xavier_uniform_(each.weight.data)
+        #     each.bias.data.zero_()
 
 
 if __name__ == '__main__':
@@ -66,6 +67,7 @@ if __name__ == '__main__':
     l1_loss = torch.nn.L1Loss()
     mse_loss = torch.nn.MSELoss()
     cross_entropy = torch.nn.CrossEntropyLoss()
+    bce_loss = torch.nn.BCEWithLogitsLoss()
     
     # Optimizer
     optimizer_D_N = torch.optim.Adam(D_N.parameters(), lr=config.train['lr_D_N'],
@@ -201,6 +203,7 @@ if __name__ == '__main__':
     writer_cycle_loss_epochs = SummaryWriter(config.train['logs'] + 'epochs/cycle_loss')
     writer_loss_D_N_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_N')
     writer_loss_D_V_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_V')
+    writer_cam_loss_epochs = SummaryWriter(config.train['logs'] + 'epochs/cam_loss')
     
     # Training
     if config.train['if_train']:
@@ -215,6 +218,7 @@ if __name__ == '__main__':
                 writer_cycle_loss_steps = SummaryWriter(config.train['logs'] + 'steps/cycle_loss')
                 writer_loss_D_N_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_N')
                 writer_loss_D_V_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_V')
+                writer_cam_loss_steps = SummaryWriter(config.train['logs'] + 'steps/cam_loss')
                 
                 D_V.train()
                 D_N.train()
@@ -230,6 +234,7 @@ if __name__ == '__main__':
                 losses_G_N2V = AverageMeter()
                 losses_D_V = AverageMeter()
                 losses_D_N = AverageMeter()
+                cam_losses = AverageMeter()
                 
                 lr_G = LambdaLR(config.train['epochs'], config.train['lr_G_decay_rate'],
                                 config.train['lr_G_decay_epoch'], config.train['lr_G']).step(epoch)
@@ -257,18 +262,17 @@ if __name__ == '__main__':
                         optimizer_G.zero_grad()
                         
                         # Gan Loss
-                        fake_vis, fake_local_vis, real_local_nir, fake_local_vis_left_eye, fake_local_vis_right_eye = G_N2V(
-                            real_nir, real_nir_left_eye, real_nir_right_eye)
-                        pred_fake_vis = D_V(fake_vis)
-                        pred_fake_vis_local_left_eye = D_V(fake_local_vis_left_eye)
-                        pred_fake_vis_local_right_eye = D_V(fake_local_vis_right_eye)
+                        fake_vis, fake_local_vis, _, fake_local_vis_left_eye, fake_local_vis_right_eye, fake_vis_cam_logit, fake_vis_heatmap = G_N2V(real_nir, real_nir_left_eye, real_nir_right_eye)
+                        pred_fake_vis, pred_fake_vis_cam_logit, pred_fake_vis_heatmap = D_V(fake_vis)
+                        pred_fake_vis_local_left_eye,_,_ = D_V(fake_local_vis_left_eye)
+                        pred_fake_vis_local_right_eye,_,_ = D_V(fake_local_vis_right_eye)
                         
                         loss_G_N2V = mse_loss(pred_fake_vis, target_real) * 5.0 + mse_loss(pred_fake_vis_local_left_eye,target_real) + mse_loss(pred_fake_vis_local_right_eye, target_real)
                         
-                        fake_nir, fake_local_nir, real_local_vis, fake_local_nir_left_eye, fake_local_nir_right_eye = G_V2N(real_vis, real_vis_left_eye, real_vis_right_eye)
-                        pred_fake_nir = D_N(fake_nir)
-                        pred_fake_nir_local_left_eye = D_N(fake_local_nir_left_eye)
-                        pred_fake_nir_local_right_eye = D_N(fake_local_nir_right_eye)
+                        fake_nir, fake_local_nir, _, fake_local_nir_left_eye, fake_local_nir_right_eye, fake_nir_cam_logit, fake_nir_heatmap = G_V2N(real_vis, real_vis_left_eye, real_vis_right_eye)
+                        pred_fake_nir, pred_fake_nir_cam_logit, pred_fake_nir_heatmap = D_N(fake_nir)
+                        pred_fake_nir_local_left_eye, _, _ = D_N(fake_local_nir_left_eye)
+                        pred_fake_nir_local_right_eye,_, _ = D_N(fake_local_nir_right_eye)
                         
                         loss_G_V2N = mse_loss(pred_fake_nir, target_real) * 5.0 + mse_loss(pred_fake_nir_local_left_eye,target_real) + mse_loss(pred_fake_nir_local_right_eye, target_real)
                         
@@ -294,13 +298,13 @@ if __name__ == '__main__':
                         # identity_loss = torch.Tensor(np.array([0.])).cuda()
                         
                         # Cycle Loss
-                        recovered_nir, recovered_local_nir, _, recovered_local_nir_left_eye, recovered_local_nir_right_eye = G_V2N(
+                        recovered_nir, recovered_local_nir, _, recovered_local_nir_left_eye, recovered_local_nir_right_eye,_ ,_ = G_V2N(
                             fake_vis, fake_local_vis_left_eye, fake_local_vis_right_eye)
                         cycle_loss_NVN = l1_loss(recovered_nir, real_nir) * 5.0 + l1_loss(recovered_local_nir_left_eye,
                                                                                           real_nir_left_eye) + l1_loss(
                             recovered_local_nir_right_eye, real_nir_right_eye)
                         
-                        recovered_vis, recovered_local_vis, _, recovered_local_vis_left_eye, recovered_local_vis_right_eye = G_N2V(
+                        recovered_vis, recovered_local_vis, _, recovered_local_vis_left_eye, recovered_local_vis_right_eye ,_ ,_= G_N2V(
                             fake_nir, fake_local_nir_left_eye, fake_local_nir_right_eye)
                         cycle_loss_VNV = l1_loss(recovered_vis, real_vis) * 5.0 + l1_loss(recovered_local_vis_left_eye,
                                                                                           real_vis_left_eye) + l1_loss(
@@ -308,9 +312,12 @@ if __name__ == '__main__':
                         
                         cycle_loss = (cycle_loss_NVN + cycle_loss_VNV) * config.train['lambda_cyc_loss']
                         
+                        
+                        cam_loss = (bce_loss(fake_vis_cam_logit,torch.ones_like(fake_vis_cam_logit).cuda()) + bce_loss(fake_nir_cam_logit,torch.ones_like(fake_vis_cam_logit).cuda())) * config.train['lambda_cam_loss']
+                        
                         # Total Loss
                         # loss_G = loss_G_N2V + loss_G_V2N + cycle_loss  + identity_loss
-                        loss_G = loss_G_total + cycle_loss + intensity_loss
+                        loss_G = loss_G_total + cycle_loss + intensity_loss + cam_loss
                         
                         loss_G.backward()
                         optimizer_G.step()
@@ -328,12 +335,11 @@ if __name__ == '__main__':
                     local_gauss = torch.from_numpy(local_gauss).float().cuda()
                     real_vis_left_eye_gauss = real_vis_left_eye + config.train['lambda_gauss'] * local_gauss * 0.4
                     real_vis_right_eye_gauss = real_vis_right_eye + config.train['lambda_gauss'] * local_gauss * 0.4
-                    pred_real_vis = D_V(real_vis)
-                    pred_real_local_vis_left_eye = D_V(real_vis_left_eye_gauss)
-                    pred_real_local_vis_right_eye = D_V(real_vis_right_eye_gauss)
-                    loss_D_V_real = mse_loss(pred_real_vis, target_real) * 5.0 + mse_loss(pred_real_local_vis_left_eye,
-                                                                                          target_real) + mse_loss(
-                        pred_real_local_vis_right_eye, target_real)
+                    
+                    pred_real_vis, pred_real_vis_cam_logit, pred_real_vis_heatmap= D_V(real_vis)
+                    pred_real_local_vis_left_eye, _, _ = D_V(real_vis_left_eye_gauss)
+                    pred_real_local_vis_right_eye, _, _ = D_V(real_vis_right_eye_gauss)
+                    loss_D_V_real = mse_loss(pred_real_vis, target_real) * 5.0 + mse_loss(pred_real_local_vis_left_eye,target_real) + mse_loss(pred_real_local_vis_right_eye, target_real)
                     
                     # Fake Loss
                     fake_vis1 = fake_vis_buffer.push_and_pop(fake_vis)
@@ -348,17 +354,21 @@ if __name__ == '__main__':
                     fake_local_vis_left_eye1_gauss = fake_local_vis_left_eye1 + config.train['lambda_gauss'] * gauss_local * 0.4
                     fake_local_vis_right_eye1_gauss = fake_local_vis_right_eye1 + config.train['lambda_gauss'] * gauss_local * 0.4
                     
-                    pred_fake_vis = D_V(fake_vis1_gauss.detach())
-                    pred_fake_local_vis_left_eye = D_V(fake_local_vis_left_eye1_gauss.detach())
-                    pred_fake_local_vis_right_eye = D_V(fake_local_vis_right_eye1_gauss.detach())
+                    pred_fake_vis,pred_fake_vis_cam_logit,pred_fake_vis_heatmap = D_V(fake_vis1_gauss.detach())
+                    pred_fake_local_vis_left_eye,_,_ = D_V(fake_local_vis_left_eye1_gauss.detach())
+                    pred_fake_local_vis_right_eye,_,_ = D_V(fake_local_vis_right_eye1_gauss.detach())
                     
                     # pred_fake_vis = D_V(fake_vis)
                     # pred_fake_local_vis_left_eye = D_V(fake_local_vis_left_eye)
                     # pred_fake_local_vis_right_eye = D_V(fake_local_vis_right_eye)
                     loss_D_V_fake = mse_loss(pred_fake_vis, target_fake) * 5.0 + mse_loss(pred_fake_local_vis_left_eye,target_fake) + mse_loss(pred_fake_local_vis_right_eye, target_fake)
                     
+                    loss_D_V_cam = bce_loss(pred_real_vis_cam_logit,torch.ones_like(pred_real_vis_cam_logit).cuda()) + bce_loss(pred_fake_vis_cam_logit,torch.zeros_like(pred_fake_vis_cam_logit).cuda())
+                    
+                    
                     # Total Loss
-                    loss_D_V = loss_D_V_real + loss_D_V_fake
+                    loss_D_V = loss_D_V_real + loss_D_V_fake + loss_D_V_cam
+                    
                     loss_D_V.backward()
                     optimizer_D_V.step()
                     # #######################################################
@@ -376,12 +386,10 @@ if __name__ == '__main__':
                     real_nir_left_eye_gauss = real_nir_left_eye + config.train['lambda_gauss'] * local_gauss
                     real_nir_right_eye_gauss = real_nir_right_eye + config.train['lambda_gauss'] * local_gauss
                     
-                    pred_real_nir = D_N(real_nir_gauss)
-                    pred_real_local_nir_left_eye = D_N(real_nir_left_eye_gauss)
-                    pred_real_local_nir_right_eye = D_N(real_nir_right_eye_gauss)
-                    loss_D_real = mse_loss(pred_real_nir, target_real) * 5.0 + mse_loss(pred_real_local_nir_left_eye,
-                                                                                        target_real) + mse_loss(
-                        pred_real_local_nir_right_eye, target_real)
+                    pred_real_nir , pred_real_nir_cam_logit, pred_real_nir_heatmap = D_N(real_nir_gauss)
+                    pred_real_local_nir_left_eye,_,_ = D_N(real_nir_left_eye_gauss)
+                    pred_real_local_nir_right_eye,_,_ = D_N(real_nir_right_eye_gauss)
+                    loss_D_real = mse_loss(pred_real_nir, target_real) * 5.0 + mse_loss(pred_real_local_nir_left_eye,target_real) + mse_loss(pred_real_local_nir_right_eye, target_real)
                     
                     # Fake Loss
 
@@ -398,19 +406,19 @@ if __name__ == '__main__':
                     fake_local_nir_left_eye_gauss = fake_local_nir_left_eye1 + config.train['lambda_gauss'] * local_gauss
                     fake_local_nir_right_eye_gauss = fake_local_nir_right_eye1 + config.train['lambda_gauss'] * local_gauss
 
-                    pred_fake_nir = D_N(fake_nir_gauss.detach())
-                    pred_fake_local_nir_left_eye = D_N(fake_local_nir_left_eye_gauss.detach())
-                    pred_fake_local_nir_right_eye = D_N(fake_local_nir_right_eye_gauss.detach())
+                    pred_fake_nir,pred_fake_nir_cam_logit,pred_fake_nir_heatmap = D_N(fake_nir_gauss.detach())
+                    pred_fake_local_nir_left_eye ,_ ,_= D_N(fake_local_nir_left_eye_gauss.detach())
+                    pred_fake_local_nir_right_eye,_ ,_ = D_N(fake_local_nir_right_eye_gauss.detach())
                     
                     # pred_fake_nir = D_V(fake_nir)
                     # pred_fake_local_nir_left_eye = D_V(fake_local_nir_left_eye)
                     # pred_fake_local_nir_right_eye = D_V(fake_local_nir_right_eye)
-                    loss_D_fake = mse_loss(pred_fake_nir, target_fake) * 5.0 + mse_loss(pred_fake_local_nir_left_eye,
-                                                                                        target_fake) + mse_loss(
-                        pred_fake_local_nir_right_eye, target_fake)
+                    loss_D_fake = mse_loss(pred_fake_nir, target_fake) * 5.0 + mse_loss(pred_fake_local_nir_left_eye,target_fake) + mse_loss(pred_fake_local_nir_right_eye, target_fake)
+                    
+                    loss_D_cam = bce_loss(pred_real_nir_cam_logit,torch.ones_like(pred_real_nir_cam_logit).cuda()) + bce_loss(pred_fake_nir_cam_logit,torch.zeros_like(pred_fake_nir_cam_logit).cuda())
                     
                     # Total Loss
-                    loss_D_N = loss_D_real + loss_D_fake
+                    loss_D_N = loss_D_real + loss_D_fake + loss_D_cam
                     loss_D_N.backward()
                     optimizer_D_N.step()
                     # ##########################################################
@@ -426,6 +434,7 @@ if __name__ == '__main__':
                     intensity_losses.update(intensity_loss.data.cpu().numpy(), config.train['batch_size'])
                     losses_D_N.update(loss_D_N.data.cpu().numpy(), config.train['batch_size'])
                     losses_D_V.update(loss_D_V.data.cpu().numpy(), config.train['batch_size'])
+                    cam_losses.update(cam_loss.data.cpu().numpy(), config.train['batch_size'])
                     
                     batch_time.update(time.time() - end_time)
                     end_time = time.time()
@@ -437,7 +446,8 @@ if __name__ == '__main__':
                     prev_time = time.time()
                     
                     bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D_V: {lr_D_V:.8f} | LR_D_N: {lr_D_N:.8f} | ' \
-                                 'Loss_G_N2V: {loss_G_N2V:.6f} | Loss_G_V2N: {loss_G_V2N:.6f} | Cycle Loss: {cycle_loss:.6f} | In Loss: {in_loss:.6f} | Loss_D_N: {loss_D_N:.6f} | Loss_D_V: {loss_D_V:.6f} | ETA: {time_left}'.format(
+                                 'Loss_G_N2V: {loss_G_N2V:.6f} | Loss_G_V2N: {loss_G_V2N:.6f} | Cycle Loss: {cycle_loss:.6f} | In Loss: {in_loss:.6f} | ' \
+                                 'Cam_loss: {cam_loss:.6f} | Loss_D_N: {loss_D_N:.6f} | Loss_D_V: {loss_D_V:.6f} | ETA: {time_left}'.format(
                         step=i,
                         epoch=epoch,
                         lr_G=lr_G,
@@ -447,6 +457,7 @@ if __name__ == '__main__':
                         loss_G_V2N=losses_G_V2N.avg,
                         cycle_loss=cycle_losses.avg,
                         in_loss=intensity_losses.avg,
+                        cam_loss=cam_losses.avg,
                         loss_D_N=losses_D_N.avg,
                         loss_D_V=losses_D_V.avg,
                         time_left=time_left,
@@ -458,6 +469,7 @@ if __name__ == '__main__':
                     writer_loss_G_V2N_steps.add_scalar('steps/loss_G_V2N', losses_G_V2N.avg, i)
                     writer_cycle_loss_steps.add_scalar('steps/cycle_loss', cycle_losses.avg, i)
                     writer_in_loss_steps.add_scalar('steps/in_loss', intensity_losses.avg, i)
+                    writer_cam_loss_steps.add_scalar('steps/cam_loss',cam_losses.avg,i)
                     writer_loss_D_N_steps.add_scalar('steps/loss_D_N', losses_D_N.avg, i)
                     writer_loss_D_V_steps.add_scalar('steps/loss_D_V', losses_D_V.avg, i)
                     
@@ -468,8 +480,10 @@ if __name__ == '__main__':
                         save_image_single(fake_nir_single, config.train['out'] + fake_nir_single_name, 112)
                         
                         fake_vis_single = fake_vis.detach().cpu().numpy()[0]
+                        fake_vis_single = RGB2BGR(tensor2numpy(denorm(fake_vis_single)))
                         fake_vis_single_name = 'fake_vis_{}_{}.png'.format(epoch, i // count)
-                        save_image_single(fake_vis_single, config.train['out'] + fake_vis_single_name, 112)
+                        # save_image_single(fake_vis_single, config.train['out'] + fake_vis_single_name, 112)
+                        cv2.imwrite(config.train['out'] + fake_vis_single_name,fake_vis_single*255.0)
                         
                         fake_local_vis_single = fake_local_vis.detach().cpu().numpy()[0]
                         fake_local_vis_single_name = 'fake_local_vis_{}_{}.png'.format(epoch, i // count)
@@ -486,6 +500,36 @@ if __name__ == '__main__':
                         real_vis_single = real_vis.detach().cpu().numpy()[0]
                         real_vis_single_name = 'real_vis_{}_{}.png'.format(epoch, i // count)
                         save_image_single(real_vis_single, config.train['out'] + real_vis_single_name, 112)
+
+                        fake_vis_cam_heatmap_single = fake_vis_heatmap.detach().cpu().numpy()[0]
+                        fake_vis_cam_heatmap_single = cam(tensor2numpy(fake_vis_cam_heatmap_single),112)
+                        fake_vis_cam_heatmap_single_name = 'fake_vis_cam_heatmap_{}_{}.png'.format(epoch,i//count)
+                        save_image_single(fake_vis_cam_heatmap_single,config.train['out'] + fake_vis_cam_heatmap_single_name)
+                        
+                        fake_nir_cam_heatmap_single = fake_nir_heatmap.detach().cpu().numpy()[0]
+                        fake_nir_cam_heatmap_single = cam(tensor2numpy(fake_nir_cam_heatmap_single),112)
+                        fake_nir_cam_heatmap_single_name = 'fake_nir_cam_heatmap_{}_{}.png'.format(epoch,i//count)
+                        save_image_single(fake_nir_cam_heatmap_single,config.train['out'] + fake_nir_cam_heatmap_single_name)
+
+                        pred_real_nir_heatmap_single = pred_real_nir_heatmap.detach().cpu().numpy()[0]
+                        pred_real_nir_heatmap_single = cam(tensor2numpy(pred_real_nir_heatmap_single), 112)
+                        pred_real_nir_heatmap_single_name = 'pred_real_nir_heatmap_{}_{}.png'.format(epoch, i // count)
+                        save_image_single(pred_real_nir_heatmap_single, config.train['out'] + pred_real_nir_heatmap_single_name)
+
+                        pred_real_vis_heatmap_single = pred_real_vis_heatmap.detach().cpu().numpy()[0]
+                        pred_real_vis_heatmap_single = cam(tensor2numpy(pred_real_vis_heatmap_single), 112)
+                        pred_real_vis_heatmap_single_name = 'pred_real_vis_heatmap_{}_{}.png'.format(epoch, i // count)
+                        save_image_single(pred_real_vis_heatmap_single, config.train['out'] + pred_real_vis_heatmap_single_name)
+
+                        pred_fake_nir_heatmap_single = pred_fake_nir_heatmap.detach().cpu().numpy()[0]
+                        pred_fake_nir_heatmap_single = cam(tensor2numpy(pred_fake_nir_heatmap_single), 112)
+                        pred_fake_nir_heatmap_single_name = 'pred_fake_nir_heatmap_{}_{}.png'.format(epoch, i // count)
+                        save_image_single(pred_fake_nir_heatmap_single, config.train['out'] + pred_fake_nir_heatmap_single_name)
+
+                        pred_fake_vis_heatmap_single = pred_fake_vis_heatmap.detach().cpu().numpy()[0]
+                        pred_fake_vis_heatmap_single = cam(tensor2numpy(pred_fake_vis_heatmap_single), 112)
+                        pred_fake_vis_heatmap_single_name = 'pred_fake_vis_heatmap_{}_{}.png'.format(epoch, i // count)
+                        save_image_single(pred_fake_vis_heatmap_single, config.train['out'] + pred_fake_vis_heatmap_single_name)
                         
                         # fake_local_vis_right_eye_single = fake_local_vis_right_eye.detach().cpu().numpy()[0]
                         # fake_local_vis_right_eye_single_name = 'fake_local_vis_right_eye_{}_{}.png'.format(epoch,i//count)
@@ -498,12 +542,13 @@ if __name__ == '__main__':
                 writer_in_loss_epochs.add_scalar('epochs/cycle_loss', intensity_losses.avg, epoch)
                 writer_loss_D_N_epochs.add_scalar('epochs/loss_D_N', losses_D_N.avg, epoch)
                 writer_loss_D_V_epochs.add_scalar('epochs/loss_D_V', losses_D_V.avg, epoch)
+                writer_cam_loss_epochs.add_scalar('epochs/cam_loss',cam_losses.avg,epoch)
                 
                 lr_schedule_G.step()
                 lr_schedule_D_N.step()
                 lr_schedule_D_V.step()
                 
-                date = '20190729'
+                date = '20190807'
                 
                 torch.save({
                     'state_dict_G_N2V': G_N2V.state_dict(),
