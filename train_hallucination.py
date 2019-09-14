@@ -194,7 +194,7 @@ if __name__ == '__main__':
     
     prev_time = time.time()
     
-    count = int(len(trainLoader) // 3)
+    count = int(len(trainLoader) // 1)
     writer_loss_G_V2N_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_G_V2N')
     writer_loss_G_N2V_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_G_N2V')
     writer_in_loss_epochs = SummaryWriter(config.train['logs'] + 'epochs/in_loss')
@@ -810,7 +810,7 @@ if __name__ == '__main__':
                 lr_schedule_D_N.step()
                 lr_schedule_D_V.step()
                 
-                date = '20190723'
+                date = '20190914'
                 
                 torch.save({
                     'state_dict_G_N2V': G_N2V.state_dict(),
