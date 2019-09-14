@@ -51,9 +51,9 @@ class Dataset(data.Dataset):
             nir_img = nir_img.transpose(Image.FLIP_LEFT_RIGHT)
             sketch_img = sketch_img.transpose(Image.FLIP_LEFT_RIGHT)
             
-        vis_img = vis_img.rotate(random.uniform(-10,10))
-        nir_img = nir_img.rotate(random.uniform(-10,10))
-        sketch_img = sketch_img.rotate(random.uniform(-10,10))
+        vis_img = vis_img.rotate(random.uniform(-1,1))
+        nir_img = nir_img.rotate(random.uniform(-1,1))
+        sketch_img = sketch_img.rotate(random.uniform(-1,1))
         
         batch = {}
         batch['vis'] = vis_img
