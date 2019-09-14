@@ -77,8 +77,8 @@ class MMD(nn.Module):
         '''
         n_samples = int(source.size()[0]) + int(target.size()[0])
         total = torch.cat([source,target],dim=0)
-        total0 = total.unsqueeze(0).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)))
-        total1 = total.unsqueeze(1).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)))
+        total0 = total.unsqueeze(0).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)),int(total.size(2)),int(total.size(3)))
+        total1 = total.unsqueeze(1).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)),int(total.size(2)),int(total.size(3)))
         L2_distance = ((total0-total1)**2).sum(2)
         if fix_sigma:
             bandwidth = fix_sigma
