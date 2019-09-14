@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "face alignment")
-    parser.add_argument("-source_root", "--source_root", help = "specify your source dir", default = "/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR/", type = str)
-    parser.add_argument("-dest_root", "--dest_root", help = "specify your destination dir", default = "/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR_Aligned/", type = str)
+    parser.add_argument("-source_root", "--source_root", help = "specify your source dir", default = "/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_sketch/sketch", type = str)
+    parser.add_argument("-dest_root", "--dest_root", help = "specify your destination dir", default = "/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_sketch/sketch_aligned", type = str)
     parser.add_argument("-crop_size", "--crop_size", help = "specify size of aligned faces, align and crop with padding", default = 112, type = int)
     args = parser.parse_args()
 
