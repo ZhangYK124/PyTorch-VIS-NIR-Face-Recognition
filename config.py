@@ -4,7 +4,7 @@ train['if_train'] = True
 train['saparately'] = False
 
 train['epochs'] = 15000
-train['batch_size'] = 3
+train['batch_size'] = 2
 train['num_workers'] = 1
 train['generator_steps'] = 2
 
