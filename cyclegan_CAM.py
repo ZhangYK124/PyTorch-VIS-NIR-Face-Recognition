@@ -14,7 +14,7 @@ import datetime
 from tensorboardX import SummaryWriter
 
 from utils import *
-import config
+import config_cam as config
 from DataLoader import Dataset
 
 from model.model_CAM import Discriminator, Generator, GlobalPathWay, LocalPathWay
@@ -196,7 +196,7 @@ if __name__ == '__main__':
     
     prev_time = time.time()
     
-    count = int(len(trainLoader) // 3)
+    count = int(len(trainLoader) // 1)
     writer_loss_G_V2N_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_G_V2N')
     writer_loss_G_N2V_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_G_N2V')
     writer_in_loss_epochs = SummaryWriter(config.train['logs'] + 'epochs/in_loss')
