@@ -195,7 +195,9 @@ class ResnetGenerator(nn.Module):
         gmp = torch.nn.functional.adaptive_max_pool2d(x, 1)
         gmp_logit = self.gmp_fc(gmp.view(x.shape[0], -1))
         gmp_weight = list(self.gmp_fc.parameters())[0]
-        gmp = x * gmp_weight.unsqueeze(2).unsqueeze(3)
+        gmp_weight = gmp_weight.unsqueeze(2)
+        gmp_weight = gmp_weight.unsqueeze(3)
+        gmp = x * gmp_weight
 
         cam_logit = torch.cat([gap_logit, gmp_logit], 1)
         x = torch.cat([gap, gmp], 1)
@@ -302,12 +304,12 @@ class Discriminator(nn.Module):
         return out, cam_logit, heatmap
     
 if __name__ == '__main__':
-    model = Discriminator().cuda()
-    # model = Generator().cuda()
+    # model = Discriminator().cuda()
+    model = Generator().cuda()
     input = Variable(torch.rand(3,3,112,112)).cuda()
     local_input = Variable(torch.rand(3,3,22,22)).cuda()
     local_feature = Variable(torch.rand(3,128,112,112)).cuda()
     # writter = SummaryWriter('./log')
     # I112_fake, local_vision, local_input, left_fake, right_fake, cam_logit, heatmap = model(input,local_input,local_input)
-    out,cam_logit, heatmap = model(local_input)
+    out,cam_logit, heatmap = model(local_input,local_input,local_input)
     print(model(input)[0].size())
