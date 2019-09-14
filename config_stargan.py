@@ -12,14 +12,14 @@ train['lambda_rec'] = 10.0
 train['lambda_gauss'] = 0.0001
 train['lambda_cls'] = 1.0
 
-train['lr_D'] = 8e-4
+train['lr_D'] = 8e-3
 train['lr_D_decay_epoch'] = 50
 train['lr_D_decay_rate'] = 0.998
 train['beta1_D'] = 0.5
 train['beta2_D'] = 0.999
 train['weight_decay_D'] = 1e-5
 
-train['lr_G'] = 1e-3
+train['lr_G'] = 5e-3
 train['lr_G_decay_epoch'] = 50
 train['lr_G_decay_rate'] = 0.998
 train['beta1_G'] = 0.5

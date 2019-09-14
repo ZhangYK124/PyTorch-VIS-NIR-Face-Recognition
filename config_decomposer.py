@@ -4,48 +4,50 @@ train['if_train'] = True
 train['saparately'] = False
 
 train['epochs'] = 2000
-train['batch_size'] = 16
+train['batch_size'] = 6
 train['num_workers'] = 1
-train['generator_steps'] = 3
+train['generator_steps'] = 4
 
 train['lambda_rec'] = 10.0
 train['lambda_gauss'] = 0.0001
-train['lambda_cls'] = 1.0
+train['lambda_cls'] = 0.0
 
-train['lr_D'] = 8e-4
-train['lr_D_decay_epoch'] = 50
-train['lr_D_decay_rate'] = 0.998
+train['lr_D'] = 8e-3
+train['lr_D_decay_epoch'] = 100
+train['lr_D_decay_rate'] = 0.999
 train['beta1_D'] = 0.5
 train['beta2_D'] = 0.999
 train['weight_decay_D'] = 1e-5
 
-train['lr_G'] = 1e-3
-train['lr_G_decay_epoch'] = 50
-train['lr_G_decay_rate'] = 0.998
+train['lr_G'] = 5e-3
+train['lr_G_decay_epoch'] = 100
+train['lr_G_decay_rate'] = 0.999
 train['beta1_G'] = 0.5
 train['beta2_G'] = 0.999
 train['weight_decay_G'] = 1e-5
 
-train['resume_G'] = None
-train['resume_D'] = None
-
-train['resume_optim_G'] = None
-train['resume_optim_D'] = None
-
-# train['resume_G_N2V'] = 'checkpoint/G_N2V_20190807.pth'
-# train['resume_G_V2N'] = 'checkpoint/G_V2N_20190807.pth'
-# train['resume_D_N'] = 'checkpoint/D_N_20190807.pth'
-# train['resume_D_V'] = 'checkpoint/D_V_20190807.pth'
+# train['resume_G'] = None
+# train['resume_Style_Encoder'] = None
+# train['resume_D_VIS'] = None
 #
-# # train['resume_optim_G_V2N'] = 'checkpoint/optimizer_G_V2N_20190807.pth'
-# # train['resume_optim_G_N2V'] = 'checkpoint/optimizer_G_N2V_20190807.pth'
-# train['resume_optim_G'] = 'checkpoint/optimizer_G_20190807.pth'
-# train['resume_optim_D_V'] = 'checkpoint/optimizer_D_V_20190807.pth'
-# train['resume_optim_D_N'] = 'checkpoint/optimizer_D_N_20190807.pth'
+# train['resume_optim_G'] = None
+# train['resume_optim_D'] = None
 
-train['checkpoint'] = './checkpoint1/'
-train['logs'] = './logs1/'
-train['out'] = './out1/'
+train['resume_Intrinsic_Encoder'] = 'checkpoint_decomposer/Intrinsic_Encoder_20190910.pth'
+train['resume_Style_Encoder'] = 'checkpoint_decomposer/Style_Encoder_20190910.pth'
+train['resume_Integrator'] = 'checkpoint_decomposer/Integrator_20190910.pth'
+train['resume_D_VIS'] = 'checkpoint_decomposer/D_VIS_20190910.pth'
+train['resume_D_NIR'] = 'checkpoint_decomposer/D_NIR_20190910.pth'
+train['resume_D_SKETCH'] = 'checkpoint_decomposer/D_SKETCH_20190910.pth'
+# # #
+train['resume_optim_G'] = 'checkpoint_decomposer/optimizer_G_20190910.pth'
+train['resume_optim_D_VIS'] = 'checkpoint_decomposer/optimizer_D_VIS_20190910.pth'
+train['resume_optim_D_NIR'] = 'checkpoint_decomposer/optimizer_D_NIR_20190910.pth'
+train['resume_optim_D_SKETCH'] = 'checkpoint_decomposer/optimizer_D_SKETCH_20190910.pth'
+
+train['checkpoint'] = './checkpoint_decomposer/'
+train['logs'] = './logs_decomposer/'
+train['out'] = './out_decomposer/'
 
 train['random_seed'] = None
 
