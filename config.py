@@ -5,7 +5,7 @@ train['saparately'] = False
 
 train['epochs'] = 15000
 train['batch_size'] = 2
-train['num_workers'] = 1
+train['num_workers'] = 0
 train['generator_steps'] = 2
 
 train['lambda_cyc_loss'] = 10.0
