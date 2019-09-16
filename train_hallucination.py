@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.utils.data as data
 from torchvision import transforms
 from torch.autograd import Variable
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 import itertools
 from tqdm import tqdm as tqdm
