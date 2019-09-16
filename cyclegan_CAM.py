@@ -12,7 +12,8 @@ import itertools
 from tqdm import tqdm as tqdm
 import datetime
 from tensorboardX import SummaryWriter
-
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 from utils import *
 import config_cam as config
 from DataLoader import Dataset
