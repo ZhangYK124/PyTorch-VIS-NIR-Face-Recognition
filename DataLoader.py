@@ -21,9 +21,9 @@ class Dataset(data.Dataset):
         
         # self.vis_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/VIS_Aligned/'
         self.vis_root = '/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_photo/photo_aligned'
-        # self.nir_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR_Aligned/'
+        self.nir_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR_Aligned/'
         # self.nir_root = '/media/hyo/文档/VIS-NIR/SKETCH/SKETCH_Aligned'
-        self.nir_root = '/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_sketch/sketch_aligned'
+        # self.nir_root = '/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_sketch/sketch_aligned'
         self.vis_img_list = os.listdir(self.vis_root)
         self.nir_img_list = os.listdir(self.nir_root)
 
@@ -36,6 +36,7 @@ class Dataset(data.Dataset):
         
     def __len__(self):
         return min(len(self.vis_img_list),len(self.nir_img_list))
+        # return 100
     
     def __getitem__(self, index):
         vis_img = Image.open(os.path.join(self.vis_root,self.vis_img_list[index],self.vis_img_list[index]+'.jpg'))
