@@ -4,7 +4,7 @@ train['if_train'] = True
 train['saparately'] = False
 
 train['epochs'] = 15000
-train['batch_size'] = 4
+train['batch_size'] = 2
 train['num_workers'] = 0
 train['generator_steps'] = 2
 
@@ -16,21 +16,21 @@ train['lambda_cam_loss'] = 60.0
 
 train['lr_D_N'] = 5e-4
 train['lr_D_N_decay_epoch'] = 2000
-train['lr_D_N_decay_rate'] = 0.999
+train['lr_D_N_decay_rate'] = 0.9995
 train['beta1_D_N'] = 0.5
 train['beta2_D_N'] = 0.999
 train['weight_decay_D_N'] = 1e-5
 
 train['lr_D_V'] = 5e-4
 train['lr_D_V_decay_epoch'] = 2000
-train['lr_D_V_decay_rate'] = 0.999
+train['lr_D_V_decay_rate'] = 0.9995
 train['beta1_D_V'] = 0.5
 train['beta2_D_V'] = 0.999
 train['weight_decay_D_V'] = 1e-5
 
 train['lr_G'] = 2e-3
 train['lr_G_decay_epoch'] = 2000
-train['lr_G_decay_rate'] = 0.999
+train['lr_G_decay_rate'] = 0.9995
 train['beta1_G'] = 0.5
 train['beta2_G'] = 0.999
 train['weight_decay_G'] = 1e-5
