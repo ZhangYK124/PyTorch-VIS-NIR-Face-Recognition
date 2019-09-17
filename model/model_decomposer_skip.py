@@ -1,3 +1,15 @@
+'''
+star GAN + disentangled learning
+skip connection + no patches
+
+We employ a latent domain discriminator to obtain the common feature space between domains rather than MMD.
+
+In order to obtain a high-resolution generative face, we may first generate a larger face images than its original size and down-sample, e.g. 224x224 --> 168x168 --> 112x112.
+
+
+Reference:
+Face Sketch Synthesis by Multi-domain Adversarial Learning.
+'''
 import torch
 import numpy as np
 
