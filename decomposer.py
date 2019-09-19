@@ -17,6 +17,7 @@ import config_decomposer as config
 from DataLoader_Star import Dataset
 
 from model.model_decomposer import Discriminator_CAM as Discriminator
+from model.model_decomposer import Discriminator as Discriminator_Domain
 from model.model_decomposer import Integrator, Intrinsic_Encoder, Style_Encoder
 from loss.loss import MMD
 
@@ -50,6 +51,13 @@ if __name__ == '__main__':
     random.seed(config.train['random_seed'])
     torch.manual_seed(config.train['random_seed'])
     
+    if not os.path.exists(config.train['logs']):
+        os.mkdir(config.train['logs'])
+    if not os.path.exists(config.train['checkpoint']):
+        os.mkdir(config.train['checkpoint'])
+    if not os.path.exists(config.train['out']):
+        os.mkdir(config.train['out'])
+    
     if config.train['cuda']:
         torch.cuda.manual_seed_all(config.train['random_seed'])
     
@@ -59,6 +67,7 @@ if __name__ == '__main__':
                                   num_workers=config.train['num_workers'])
     
     # Model
+    D_DOMAIN = Discriminator_Domain()
     D_VIS = Discriminator()
     D_NIR = Discriminator()
     D_SKETCH = Discriminator()
@@ -73,6 +82,9 @@ if __name__ == '__main__':
     mmd = MMD()
     
     # Optimizer
+    optimizer_D_DOMAIN = torch.optim.Adam(D_DOMAIN.parameters(), lr=config.train['lr_D']*0.01,
+                                          betas=(config.train['beta1_D'], config.train['beta2_D']),
+                                          weight_decay=config.train['weight_decay_D'])
     optimizer_D_VIS = torch.optim.Adam(D_VIS.parameters(), lr=config.train['lr_D'],
                                        betas=(config.train['beta1_D'], config.train['beta2_D']),
                                        weight_decay=config.train['weight_decay_D'])
@@ -122,6 +134,9 @@ if __name__ == '__main__':
         checkpoint = torch.load(config.train['resume_D_SKETCH'])
         D_SKETCH.load_state_dict(checkpoint['state_dict_D_SKETCH'])
         
+        checkpoint = torch.load(config.train['resume_D_DOMAIN'])
+        D_DOMAIN.load_state_dict(checkpoint['state_dict_D_DOMAIN'])
+        
         start_epoch = checkpoint['epoch_D_SKETCH']
         
         optim_checkpoint_VIS = torch.load(config.train['resume_optim_D_VIS'])
@@ -147,6 +162,14 @@ if __name__ == '__main__':
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
                     state[k] = v.cuda()
+        
+        optim_checkpoint_DOMAIN = torch.load(config.train['resume_optim_D_DOMAIN'])
+        optimizer_D_DOMAIN.load_state_dict(optim_checkpoint_SKETCH)
+        
+        for state in optimizer_D_DOMAIN.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
     
     else:
         D_VIS.apply(weights_init)
@@ -158,6 +181,7 @@ if __name__ == '__main__':
         D_VIS.cuda()
         D_NIR.cuda()
         D_SKETCH.cuda()
+        D_DOMAIN.cuda()
         Intrinsic_Encoder.cuda()
         Style_Encoder.cuda()
         Integrator.cuda()
@@ -183,10 +207,14 @@ if __name__ == '__main__':
                                                                                                     config.train['lr_D_decay_rate'],
                                                                                                     config.train['lr_D_decay_epoch'],
                                                                                                     config.train['lr_D']).step)
+    lr_schedule_D_DOMAIN = torch.optim.lr_scheduler.LambdaLR(optimizer_D_DOMAIN, lr_lambda=LambdaLR(config.train['epochs'],
+                                                                                                    config.train['lr_D_decay_rate'],
+                                                                                                    config.train['lr_D_decay_epoch'],
+                                                                                                    config.train['lr_D']).step)
     
     prev_time = time.time()
     
-    count = int(len(trainLoader) // 5)
+    count = int(len(trainLoader) // 1)
     
     vis_buffer = ReplayBuffer()
     nir_buffer = ReplayBuffer()
@@ -197,6 +225,7 @@ if __name__ == '__main__':
     writer_loss_D_VIS_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_VIS')
     writer_loss_D_NIR_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_NIR')
     writer_loss_D_SKETCH_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_SKETCH')
+    writer_loss_D_DOMAIN_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_DOMAIN')
     
     # Training
     if config.train['if_train']:
@@ -205,10 +234,12 @@ if __name__ == '__main__':
             writer_loss_D_VIS_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_VIS')
             writer_loss_D_NIR_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_NIR')
             writer_loss_D_SKETCH_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_SKETCH')
+            writer_loss_D_DOMAIN_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_DOMAIN')
             
             D_VIS.train()
             D_NIR.train()
             D_SKETCH.train()
+            D_DOMAIN.train()
             Integrator.train()
             Style_Encoder.train()
             Intrinsic_Encoder.train()
@@ -219,6 +250,7 @@ if __name__ == '__main__':
             losses_D_VIS = AverageMeter()
             losses_D_NIR = AverageMeter()
             losses_D_SKETCH = AverageMeter()
+            losses_D_DOMAIN = AverageMeter()
             
             lr_G = LambdaLR(config.train['epochs'], config.train['lr_G_decay_rate'],
                             config.train['lr_G_decay_epoch'], config.train['lr_G']).step(epoch)
@@ -234,7 +266,7 @@ if __name__ == '__main__':
                     batch[k] = batch[k].cuda()
                 
                 step = 0
-                for src in ['sketch', 'vis', 'nir','sketch']:
+                for src in ['sketch', 'vis']:
                     if src == 'vis':
                         c_src = 0
                         D_X = D_VIS
@@ -263,8 +295,8 @@ if __name__ == '__main__':
                         writer_loss_D_X_steps = writer_loss_D_SKETCH_steps
                     
                     x_real = batch[src]
-                    target_list = ['vis', 'sketch','vis', 'nir','vis']
-                    if src in target_list:
+                    target_list = ['vis', 'sketch']
+                    while src in target_list:
                         target_list.remove(src)
                     
                     for tgt in target_list:
@@ -328,9 +360,17 @@ if __name__ == '__main__':
                             # cycle consistency loss
                             g_cycle = l1_loss(x_real, x_recon) + l1_loss(y_real, y_recon)
                             
-                            # mmd loss
-                            g_mmd = mmd(x_intrinsic, y_intrinsic) + mmd(xy_intrinsic, yx_intrinsic) + mmd(x_intrinsic, yx_intrinsic) + mmd(
-                                y_intrinsic, xy_intrinsic)
+                            # # mmd loss
+                            # g_mmd = mmd(x_intrinsic, y_intrinsic) + mmd(xy_intrinsic, yx_intrinsic) + mmd(x_intrinsic, yx_intrinsic) + mmd(
+                            #     y_intrinsic, xy_intrinsic)
+                            domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
+                            domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
+                            domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
+                            domain_cls4 = D_DOMAIN(y_intrinsic, xy_intrinsic)
+                            g_domain = mse_loss(domain_cls1, torch.ones_like(domain_cls1).cuda()) \
+                                       + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda()) \
+                                       + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda()) \
+                                       + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda())
                             
                             # adv loss & cam loss
                             x_rec_adv, x_rec_adv_cam_logit, _ = D_X(x_rec)
@@ -350,7 +390,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 50.0 + g_cycle * 50.0 + g_mmd * 20.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0
+                            g_loss = g_recon * 50.0 + g_cycle * 50.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0 + g_domain * 20.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
@@ -385,6 +425,31 @@ if __name__ == '__main__':
                         d_loss_x = d_X_adv * 50.0 + d_X_cam * 100.0
                         d_loss_y = d_Y_adv * 50.0 + d_Y_cam * 100.0
                         
+                        x_intrinsic = Intrinsic_Encoder(x_real)
+                        y_intrinsic = Intrinsic_Encoder(y_real)
+                        
+                        x_style, x_style_logit = Style_Encoder(x_real)
+                        y_style, y_style_logit = Style_Encoder(y_real)
+                        
+                        # x_rec, x_rec_heatmap, x_cam_logit = Integrator(x_intrinsic, x_style)
+                        # y_rec, y_rec_heatmap, y_cam_logit = Integrator(y_intrinsic, y_style)
+                        
+                        xy, xy_heatmap, xy_cam_logit = Integrator(x_intrinsic, y_style)
+                        yx, yx_heatmap, yx_cam_logit = Integrator(y_intrinsic, x_style)
+                        
+                        xy_intrinsic = Intrinsic_Encoder(xy)
+                        yx_intrinsic = Intrinsic_Encoder(yx)
+                        
+                        domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
+                        domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
+                        domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
+                        domain_cls4 = D_DOMAIN(y_intrinsic, xy_intrinsic)
+                        d_domain = mse_loss(domain_cls1, torch.zeros_like(domain_cls1).cuda()) \
+                                   + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
+                                   + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
+                                   + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda())
+                        d_domain = d_domain * 1000.0
+                        
                         # Backward and optimize.
                         optimizer_D_X.zero_grad()
                         d_loss_x.backward()
@@ -394,17 +459,23 @@ if __name__ == '__main__':
                         d_loss_y.backward()
                         optimizer_D_Y.step()
                         
+                        optimizer_D_DOMAIN.zero_grad()
+                        d_domain.backward()
+                        optimizer_D_DOMAIN.step()
+                        
                         # =================================================================================== #
                         #                                 4. Miscellaneous                                    #
                         # =================================================================================== #
                         losses_G.update(g_loss.data.cpu().numpy(), config.train['batch_size'])
                         losses_D_X.update(d_loss_x.data.cpu().numpy(), config.train['batch_size'])
                         losses_D_Y.update(d_loss_y.data.cpu().numpy(), config.train['batch_size'])
+                        losses_D_DOMAIN.update(d_domain.data.cpu().numpy(), config.train['batch_size'])
                         
                         # SummaryWriter
                         writer_loss_G_steps.add_scalar('steps/loss_G', losses_G.avg, i)
                         writer_loss_D_X_steps.add_scalar('steps/loss_D_' + src, losses_D_X.avg, i)
                         writer_loss_D_Y_steps.add_scalar('steps/loss_D_' + tgt, losses_D_Y.avg, i)
+                        writer_loss_D_DOMAIN_steps.add_scalar('steps/loss_D_DOMAIN', losses_D_DOMAIN.avg, i)
                         
                         # Determine approximate time left
                         batch_time.update(time.time() - end_time)
@@ -415,7 +486,7 @@ if __name__ == '__main__':
                         prev_time = time.time()
                         
                         bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f} | Loss_G: {loss_G:.6f} |' \
-                                     '  Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | ETA: {time_left}'.format(
+                                     '  Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | Loss_D_DOMAIN: {loss_D_DOMAIN:.6f} | ETA: {time_left}'.format(
                             step=i * 6 + step,
                             epoch=epoch,
                             lr_G=lr_G,
@@ -424,6 +495,7 @@ if __name__ == '__main__':
                             loss_D_VIS=losses_D_VIS.avg,
                             loss_D_NIR=losses_D_NIR.avg,
                             loss_D_SKETCH=losses_D_SKETCH.avg,
+                            loss_D_DOMAIN=losses_D_DOMAIN.avg,
                             time_left=time_left,
                         )
                         print(bar.suffix)
@@ -457,13 +529,15 @@ if __name__ == '__main__':
             writer_loss_D_SKETCH_epochs.add_scalar('epochs/loss_D_SKETCH', losses_D_SKETCH.avg, epoch)
             writer_loss_D_VIS_epochs.add_scalar('epochs/loss_D_VIS', losses_D_VIS.avg, epoch)
             writer_loss_D_NIR_epochs.add_scalar('epochs/loss_D_NIR', losses_D_NIR.avg, epoch)
+            writer_loss_D_DOMAIN_epochs.add_scalar('epochs/loss_D_DOMAIN', losses_D_DOMAIN.avg, epoch)
             
             lr_schedule_G.step()
             lr_schedule_D_VIS.step()
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
+            lr_schedule_D_DOMAIN.step()
             
-            date = '20190910'
+            date = '20190919'
             
             torch.save({
                 'state_dict_Intrinsic_Encoder': Intrinsic_Encoder.state_dict(),
@@ -490,6 +564,10 @@ if __name__ == '__main__':
                 'state_dict_D_SKETCH': D_SKETCH.state_dict(),
                 'epoch_D_SKETCH': epoch
             }, os.path.join(config.train['checkpoint'], 'D_SKETCH_' + date + '.pth'))
+            torch.save({
+                'state_dict_D_DOMAIN': D_DOMAIN.state_dict(),
+                'epoch_D_DOMAIN': epoch
+            }, os.path.join(config.train['checkpoint'], 'D_DOMAIN_' + date + '.pth'))
             torch.save(optimizer_G.state_dict(),
                        os.path.join(config.train['checkpoint'], 'optimizer_G_' + date + '.pth'))
             torch.save(optimizer_D_VIS.state_dict(),
@@ -498,3 +576,5 @@ if __name__ == '__main__':
                        os.path.join(config.train['checkpoint'], 'optimizer_D_NIR_' + date + '.pth'))
             torch.save(optimizer_D_SKETCH.state_dict(),
                        os.path.join(config.train['checkpoint'], 'optimizer_D_SKETCH_' + date + '.pth'))
+            torch.save(optimizer_D_DOMAIN.state_dict(),
+                       os.path.join(config.train['checkpoint'], 'optimizer_D_DOMAIN_' + date + '.pth'))
