@@ -82,7 +82,7 @@ if __name__ == '__main__':
     mmd = MMD()
     
     # Optimizer
-    optimizer_D_DOMAIN = torch.optim.Adam(D_DOMAIN.parameters(), lr=config.train['lr_D']*0.01,
+    optimizer_D_DOMAIN = torch.optim.Adam(D_DOMAIN.parameters(), lr=config.train['lr_D'] * 0.01,
                                           betas=(config.train['beta1_D'], config.train['beta2_D']),
                                           weight_decay=config.train['weight_decay_D'])
     optimizer_D_VIS = torch.optim.Adam(D_VIS.parameters(), lr=config.train['lr_D'],
@@ -266,7 +266,7 @@ if __name__ == '__main__':
                     batch[k] = batch[k].cuda()
                 
                 step = 0
-                for src in ['sketch', 'vis']:
+                for src in ['sketch', 'nir', 'vis']:
                     if src == 'vis':
                         c_src = 0
                         D_X = D_VIS
@@ -295,7 +295,7 @@ if __name__ == '__main__':
                         writer_loss_D_X_steps = writer_loss_D_SKETCH_steps
                     
                     x_real = batch[src]
-                    target_list = ['vis', 'sketch']
+                    target_list = ['vis', 'sketch', 'nir']
                     while src in target_list:
                         target_list.remove(src)
                     
