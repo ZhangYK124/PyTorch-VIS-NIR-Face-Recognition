@@ -1,3 +1,7 @@
+'''
+We downsample the intrinsic feature to channel x 1 x 1 rather than channel x 112 x 112.
+'''
+
 import torch
 import numpy as np
 
@@ -111,10 +115,10 @@ class Hourglass(nn.Module):
 
 
 class Style_Encoder(nn.Module):
-    def __init__(self, ngf=64, n_blocks=3):
+    def __init__(self, ngf=64, n_blocks=2):
         super(Style_Encoder, self).__init__()
         self.conv_in = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.cls = nn.Linear(128, 3)
+        self.cls = nn.Linear(256, 3)
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(128, out_channels=512, kernel_size=4, stride=1, padding=0),
             nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=4, stride=4, padding=1, output_padding=0),
@@ -132,7 +136,7 @@ class Style_Encoder(nn.Module):
                   nn.ReLU(inplace=True)]
         
         # Down sampling
-        n_downsampling = 1
+        n_downsampling = 2
         for i in range(n_downsampling):
             mult = 2 ** i
             Style += [nn.ReflectionPad2d(1),
@@ -140,7 +144,7 @@ class Style_Encoder(nn.Module):
                       nn.InstanceNorm2d(ngf * mult * 2),
                       nn.ReLU(True)]
         
-        mult = 2 * n_downsampling
+        mult = 2 ** n_downsampling
         for i in range(n_blocks):
             Style += [_Residual_Block(ngf * mult)]
         
@@ -156,37 +160,41 @@ class Style_Encoder(nn.Module):
 
 
 class Intrinsic_Encoder(nn.Module):
-    def __init__(self, ngf=64, n_blocks=10):
+    def __init__(self, ngf=64, n_blocks=2):
         super(Intrinsic_Encoder, self).__init__()
         self.conv_in = nn.Conv2d(in_channels=3, out_channels=ngf, kernel_size=3, stride=1, padding=1, bias=False)
         
         # **************************    Intrinsic    *************************
         Intrinsic_Decomposer = []
         Intrinsic_Decomposer += [nn.ReflectionPad2d(3),
-                                 nn.Conv2d(ngf, ngf *2, kernel_size=7, stride=1, padding=0, bias=False),
-                                 nn.InstanceNorm2d(ngf*2),
+                                 nn.Conv2d(ngf, ngf, kernel_size=7, stride=1, padding=0, bias=False),
+                                 nn.InstanceNorm2d(ngf * 2),
                                  nn.ReLU(inplace=True)]
         
         # Down sampling
-        n_downsampling = 0
+        n_downsampling = 4
         for i in range(n_downsampling):
             mult = 2 ** i
             Intrinsic_Decomposer += [nn.ReflectionPad2d(1),
                                      nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=0, bias=False),
                                      nn.InstanceNorm2d(ngf * mult * 2),
                                      nn.ReLU(True)]
+            for j in range(n_blocks):
+                Intrinsic_Decomposer += [_Residual_Block(ngf * 2 * mult)]
+            Intrinsic_Decomposer += [nn.InstanceNorm2d(ngf * 2 * mult)]
+        Intrinsic_Decomposer += [nn.Conv2d(ngf * 2 * mult, ngf * 2 * mult * 2, kernel_size=7, stride=1, padding=0, bias=False)]
         
-        mult = 2 ** n_downsampling
-        for i in range(n_blocks):
-            Intrinsic_Decomposer += [_Residual_Block(ngf*2 * mult),
-                                     nn.InstanceNorm2d(ngf*2 * mult)]
+        # mult = 2 ** n_downsampling
+        # for i in range(n_blocks):
+        #     Intrinsic_Decomposer += [_Residual_Block(ngf * 2 * mult),
+        #                              nn.InstanceNorm2d(ngf * 2 * mult)]
         
         self.Intrinsic = nn.Sequential(*Intrinsic_Decomposer)
-        
-    def make_layer(self, block, num_of_layer,in_channel, out_channel,kernel_size,stride,padding):
+    
+    def make_layer(self, block, num_of_layer, in_channel, out_channel, kernel_size, stride, padding):
         layers = []
         for _ in range(num_of_layer):
-            layers.append(block(in_channel,out_channel,kernel_size,stride,padding))
+            layers.append(block(in_channel, out_channel, kernel_size, stride, padding))
         return nn.Sequential(*layers)
     
     def forward(self, x):
@@ -196,27 +204,27 @@ class Intrinsic_Encoder(nn.Module):
 
 
 class Integrator(nn.Module):
-    def __init__(self, ngf=64, n_blocks=10):
+    def __init__(self, ngf=64, n_blocks=8):
         super(Integrator, self).__init__()
         self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(128, out_channels=512, kernel_size=4, stride=1, padding=0),
+            nn.ConvTranspose2d(2304, out_channels=1024, kernel_size=4, stride=1, padding=0),
+            nn.ConvTranspose2d(in_channels=1024, out_channels=512, kernel_size=4, stride=4, padding=1, output_padding=0),
+            nn.InstanceNorm2d(512),
+            nn.ReLU(True),
             nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=4, stride=4, padding=1, output_padding=0),
+            nn.ReflectionPad2d(1),
             nn.InstanceNorm2d(256),
             nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=4, padding=1, output_padding=0),
-            nn.ReflectionPad2d(1),
-            nn.InstanceNorm2d(128),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=4, stride=2, padding=2, output_padding=0),
+            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=2, output_padding=0),
             nn.ReflectionPad2d(1),
             nn.InstanceNorm2d(128)
-            )
-
+        )
+        
         # Class Activation Map
-        mult = 2
+        mult = 1
         self.gap_fc = nn.Linear(ngf * mult * 2, 1, bias=False)
         self.gmp_fc = nn.Linear(ngf * mult * 2, 1, bias=False)
-        self.conv1x1 = nn.Conv2d(ngf * mult * 4, ngf * mult, kernel_size=1, stride=1, bias=True)
+        self.conv1x1 = nn.Conv2d(ngf * mult * 4, ngf * mult * 2, kernel_size=1, stride=1, bias=True)
         self.relu = nn.ReLU(inplace=True)
         
         # Down sampling
@@ -226,16 +234,16 @@ class Integrator(nn.Module):
         for i in range(n_downsampling):
             mult = 2 ** (n_downsampling - i)
             Model += [
-                     # nn.ConvTranspose2d(in_channels=ngf * mult, out_channels=ngf*mult,kernel_size=3,stride=2,padding=1,bias=False,output_padding=1),
-                     # nn.Upsample(scale_factor=2, mode='nearest'),
-                     # nn.ReflectionPad2d(1),
-                     nn.Conv2d(ngf * mult, ngf * mult // 2, kernel_size=3, stride=1, padding=1, bias=False),
-                     nn.InstanceNorm2d(ngf * mult / 2),
-                     nn.ReLU(True)]
+                # nn.ConvTranspose2d(in_channels=ngf * mult, out_channels=ngf*mult,kernel_size=3,stride=2,padding=1,bias=False,output_padding=1),
+                # nn.Upsample(scale_factor=2, mode='nearest'),
+                # nn.ReflectionPad2d(1),
+                nn.Conv2d(ngf * mult, ngf * mult // 2, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.InstanceNorm2d(ngf * mult / 2),
+                nn.ReLU(True)]
         for i in range(n_blocks):
             Model += [_Residual_Block(ngf)]
             Model += [nn.InstanceNorm2d(ngf)]
-            
+        
         Model += [nn.ReflectionPad2d(1),
                   nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
                   nn.InstanceNorm2d(ngf),
@@ -244,38 +252,39 @@ class Integrator(nn.Module):
                   nn.Tanh()]
         
         self.model = nn.Sequential(*Model)
-        
-    def make_layer(self, block, num_of_layer,in_channel, out_channel,kernel_size,stride,padding):
+    
+    def make_layer(self, block, num_of_layer, in_channel, out_channel, kernel_size, stride, padding):
         layers = []
         for _ in range(num_of_layer):
-            layers.append(block(in_channel,out_channel,kernel_size,stride,padding))
+            layers.append(block(in_channel, out_channel, kernel_size, stride, padding))
         return nn.Sequential(*layers)
     
     def forward(self, intrinsic, style):
-        style_feature = self.deconv(style)
-        feature = torch.cat([intrinsic, style_feature], 1)
-
+        feature = torch.cat([intrinsic, style], 1)
+        feature = self.deconv(feature)
+        # feature = torch.cat([intrinsic, style_feature], 1)
+        
         gap = F.adaptive_avg_pool2d(feature, 1)
         gap_logit = self.gap_fc(gap.view(feature.shape[0], -1))
         gap_weight = list(self.gap_fc.parameters())[0]
         gap = feature * gap_weight.unsqueeze(2).unsqueeze(3)
-
+        
         gmp = F.adaptive_max_pool2d(feature, 1)
         gmp_logit = self.gmp_fc(gmp.view(feature.shape[0], -1))
         # gmp_logit = self.softmax(gmp_logit)
         gmp_weight = list(self.gmp_fc.parameters())[0]
         gmp = feature * gmp_weight.unsqueeze(2).unsqueeze(3)
-
+        
         cam_logit = torch.cat([gap_logit, gmp_logit], 1)
         # out_cls = (gap_logit+gmp_logit)/2.0
         feature = torch.cat([gap, gmp], 1)
         feature = self.relu(self.conv1x1(feature))
-
+        
         heatmap = torch.sum(feature, dim=1, keepdim=True)
         
         out = self.model(feature)
         
-        return out,heatmap,cam_logit
+        return out, heatmap, cam_logit
 
 
 class Generator(nn.Module):
@@ -440,15 +449,29 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     """Discriminator network with PatchGAN."""
     
-    def __init__(self, image_size=112, conv_dim=256, c_dim=3, repeat_num=3):
+    def __init__(self, image_size=112, conv_dim=128, c_dim=3, repeat_num=2):
         super(Discriminator, self).__init__()
+        self.deconv = nn.Sequential(
+            nn.ConvTranspose2d(4096, out_channels=1024, kernel_size=4, stride=1, padding=0),
+            nn.ConvTranspose2d(in_channels=1024, out_channels=512, kernel_size=4, stride=4, padding=1, output_padding=0),
+            nn.InstanceNorm2d(512),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=4, stride=4, padding=1, output_padding=0),
+            nn.ReflectionPad2d(1),
+            nn.InstanceNorm2d(256),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=2, output_padding=0),
+            nn.ReflectionPad2d(1),
+            nn.InstanceNorm2d(128)
+        )
+        
         layers = []
-        layers.append(nn.Conv2d(conv_dim, conv_dim, kernel_size=4, stride=2, padding=1))
+        layers.append(nn.Conv2d(conv_dim, conv_dim, kernel_size=3, stride=1, padding=1))
         layers.append(nn.LeakyReLU(0.01))
         
         curr_dim = conv_dim
         for i in range(1, repeat_num):
-            layers.append(nn.Conv2d(curr_dim, curr_dim * 2, kernel_size=4, stride=2, padding=1))
+            layers.append(nn.Conv2d(curr_dim, curr_dim * 2, kernel_size=3, stride=1, padding=1))
             layers.append(nn.LeakyReLU(0.01))
             curr_dim = curr_dim * 2
         
@@ -457,8 +480,9 @@ class Discriminator(nn.Module):
         self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=3, stride=1, padding=1, bias=False)
         # self.conv2 = nn.Conv2d(curr_dim, c_dim, kernel_size=kernel_size, bias=False)
     
-    def forward(self, x1,x2):
-        x = torch.cat([x1,x2],dim=1)
+    def forward(self, x1, x2):
+        x = torch.cat([x1, x2], dim=1)
+        x = self.deconv(x)
         h = self.main(x)
         out_src = self.conv1(h)
         # out_cls = self.conv2(h)
@@ -528,11 +552,14 @@ class Discriminator_CAM(nn.Module):
 
 if __name__ == '__main__':
     # model = Discriminator().cuda()
-    model = Generator().cuda()
+    # model = Generator().cuda()
+    model = Integrator().cuda()
     input = Variable(torch.rand(8, 3, 112, 112)).cuda()
+    intrinsic = Variable(torch.rand(8,2048,1,1)).cuda()
+    style = Variable(torch.rand(8,256,1,1)).cuda()
     # c = 1
     # writter = SummaryWriter('./log')
-    src, c, _, _, _, _ = model(input)
+    src,_,_ = model(intrinsic,style)
     batch_size = cls.size(0)
     out = torch.zeros(batch_size, 3)
     out[np.arange(batch_size), 2] = 1
