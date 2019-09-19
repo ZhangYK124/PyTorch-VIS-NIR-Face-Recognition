@@ -15,9 +15,11 @@ import pdb
 
 class Dataset(data.Dataset):
     def __init__(self):
-        self.vis_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/VIS_Aligned/'
+        # self.vis_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/VIS_Aligned/'
+        self.vis_root = '/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_photo/photo_aligned'
         self.nir_root = '/media/hyo/文档/VIS-NIR/CASIA_VIS_NIR/NIR_Aligned/'
-        self.sketch_root = '/media/hyo/文档/VIS-NIR/SKETCH/cropped_sketch'
+        # self.sketch_root = '/media/hyo/文档/VIS-NIR/SKETCH/cropped_sketch'
+        self.sketch_root = '/media/hyo/文档/VIS-NIR/SKETCH/CUFS/CUHK_training_sketch/sketch_aligned'
 
         self.vis_img_list = os.listdir(self.vis_root)
         self.nir_img_list = os.listdir(self.nir_root)
@@ -43,7 +45,7 @@ class Dataset(data.Dataset):
         
         # sketch_name = choice(self.sketch_img_list)
         sketch_name = self.sketch_img_list[index]
-        sketch_img = Image.open(os.path.join(self.sketch_root,sketch_name))
+        sketch_img = Image.open(os.path.join(self.sketch_root,sketch_name,sketch_name + '.jpg'))
         
         seed = random.random()
         if seed >0.5:
