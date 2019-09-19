@@ -6,7 +6,7 @@ train['saparately'] = False
 train['epochs'] = 15000
 train['batch_size'] = 4
 train['num_workers'] = 0
-train['generator_steps'] = 2
+train['generator_steps'] = 4
 
 train['lambda_cyc_loss'] = 10.0
 train['lambda_id_loss'] = 0
@@ -28,7 +28,7 @@ train['beta1_D_V'] = 0.5
 train['beta2_D_V'] = 0.999
 train['weight_decay_D_V'] = 1e-5
 
-train['lr_G'] = 5e-3
+train['lr_G'] = 2e-3
 train['lr_G_decay_epoch'] = 2000
 train['lr_G_decay_rate'] = 0.9995
 train['beta1_G'] = 0.5
