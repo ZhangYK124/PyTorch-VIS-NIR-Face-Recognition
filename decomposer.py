@@ -137,7 +137,7 @@ if __name__ == '__main__':
         checkpoint = torch.load(config.train['resume_D_DOMAIN'])
         D_DOMAIN.load_state_dict(checkpoint['state_dict_D_DOMAIN'])
         
-        start_epoch = checkpoint['epoch_D_SKETCH']
+        start_epoch = checkpoint['epoch_D_DOMAIN']
         
         optim_checkpoint_VIS = torch.load(config.train['resume_optim_D_VIS'])
         optimizer_D_VIS.load_state_dict(optim_checkpoint_VIS)
@@ -164,7 +164,7 @@ if __name__ == '__main__':
                     state[k] = v.cuda()
         
         optim_checkpoint_DOMAIN = torch.load(config.train['resume_optim_D_DOMAIN'])
-        optimizer_D_DOMAIN.load_state_dict(optim_checkpoint_SKETCH)
+        optimizer_D_DOMAIN.load_state_dict(optim_checkpoint_DOMAIN)
         
         for state in optimizer_D_DOMAIN.state.values():
             for k, v in state.items():
@@ -390,7 +390,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 50.0 + g_cycle * 50.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0 + g_domain * 20.0
+                            g_loss = g_recon * 100.0 + g_cycle * 80.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0 + g_domain * 20.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
