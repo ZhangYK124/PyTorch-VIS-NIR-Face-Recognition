@@ -82,7 +82,7 @@ if __name__ == '__main__':
     mmd = MMD()
     
     # Optimizer
-    optimizer_D_DOMAIN = torch.optim.Adam(D_DOMAIN.parameters(), lr=config.train['lr_D'] * 0.01,
+    optimizer_D_DOMAIN = torch.optim.Adam(D_DOMAIN.parameters(), lr=config.train['lr_D'],
                                           betas=(config.train['beta1_D'], config.train['beta2_D']),
                                           weight_decay=config.train['weight_decay_D'])
     optimizer_D_VIS = torch.optim.Adam(D_VIS.parameters(), lr=config.train['lr_D'],
