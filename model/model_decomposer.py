@@ -469,6 +469,12 @@ class Discriminator(nn.Module):
         layers.append(nn.Conv2d(conv_dim, conv_dim, kernel_size=3, stride=1, padding=1))
         layers.append(nn.LeakyReLU(0.01))
         
+        fc = []
+        fc.append(nn.Linear(4096,1024))
+        fc.append(nn.Linear(1024,512))
+        fc.append(nn.Linear(512,128))
+        fc.append(nn.Linear(128,1))
+        
         curr_dim = conv_dim
         for i in range(1, repeat_num):
             layers.append(nn.Conv2d(curr_dim, curr_dim * 2, kernel_size=3, stride=1, padding=1))
@@ -476,15 +482,17 @@ class Discriminator(nn.Module):
             curr_dim = curr_dim * 2
         
         kernel_size = int(image_size / np.power(2, repeat_num))
+        self.fc = nn.Sequential(*fc)
         self.main = nn.Sequential(*layers)
         self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=3, stride=1, padding=1, bias=False)
         # self.conv2 = nn.Conv2d(curr_dim, c_dim, kernel_size=kernel_size, bias=False)
     
     def forward(self, x1, x2):
         x = torch.cat([x1, x2], dim=1)
-        x = self.deconv(x)
-        h = self.main(x)
-        out_src = self.conv1(h)
+        # x = self.deconv(x)
+        # h = self.main(x)
+        out_src = self.fc(x.view(x.shape[0], -1))
+        # out_src = self.conv1(h)
         # out_cls = self.conv2(h)
         # out_src = F.adaptive_avg_pool2d(out_src, out_src.size()[2:]).view(out_src.size()[0],-1)
         # return out_src, out_cls.view(out_cls.size(0), out_cls.size(1))
