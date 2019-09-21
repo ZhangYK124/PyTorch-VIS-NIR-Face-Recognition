@@ -506,7 +506,7 @@ if __name__ == '__main__':
                             time_left=time_left,
                         )
                         print(bar.suffix)
-                        step += 1
+                        # step += 1
                         
                         # Save Image
                         if i % count == 0:
