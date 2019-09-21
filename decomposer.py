@@ -390,7 +390,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 100.0 + g_cycle * 80.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0 + g_domain * 20.0
+                            g_loss = g_recon * 200.0 + g_cycle * 80.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0 + g_domain * 200.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
