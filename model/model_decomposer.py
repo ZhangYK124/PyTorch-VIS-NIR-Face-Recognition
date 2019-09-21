@@ -204,7 +204,7 @@ class Intrinsic_Encoder(nn.Module):
 
 
 class Integrator(nn.Module):
-    def __init__(self, ngf=64, n_blocks=6):
+    def __init__(self, ngf=64, n_blocks=10):
         super(Integrator, self).__init__()
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(2304, out_channels=1024, kernel_size=4, stride=1, padding=0),
