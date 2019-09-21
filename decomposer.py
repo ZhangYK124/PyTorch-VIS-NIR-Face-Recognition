@@ -1,7 +1,9 @@
 import time
+import os
 import numpy as np
 import torch
 import random
+from random import choice
 import torch.nn as nn
 import torch.utils.data as data
 from torchvision import transforms
@@ -266,7 +268,10 @@ if __name__ == '__main__':
                     batch[k] = batch[k].cuda()
                 
                 step = 0
-                for src in ['sketch', 'nir', 'vis']:
+                src_list = ['sketch', 'nir', 'vis']
+                # for src in ['sketch', 'nir', 'vis']:
+                if True:
+                    src = choice(src_list)
                     if src == 'vis':
                         c_src = 0
                         D_X = D_VIS
@@ -299,7 +304,9 @@ if __name__ == '__main__':
                     while src in target_list:
                         target_list.remove(src)
                     
-                    for tgt in target_list:
+                    # for tgt in target_list:
+                    if True:
+                        tgt = choice(target_list)
                         if tgt == 'vis':
                             c_tgt = 0
                             D_Y = D_VIS
@@ -487,7 +494,7 @@ if __name__ == '__main__':
                         
                         bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f} | Loss_G: {loss_G:.6f} |' \
                                      '  Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | Loss_D_DOMAIN: {loss_D_DOMAIN:.6f} | ETA: {time_left}'.format(
-                            step=i * 6 + step,
+                            step=i,
                             epoch=epoch,
                             lr_G=lr_G,
                             lr_D=lr_D,
