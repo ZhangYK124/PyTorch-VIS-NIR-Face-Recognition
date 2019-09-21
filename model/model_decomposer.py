@@ -160,7 +160,7 @@ class Style_Encoder(nn.Module):
 
 
 class Intrinsic_Encoder(nn.Module):
-    def __init__(self, ngf=64, n_blocks=2):
+    def __init__(self, ngf=64, n_blocks=4):
         super(Intrinsic_Encoder, self).__init__()
         self.conv_in = nn.Conv2d(in_channels=3, out_channels=ngf, kernel_size=3, stride=1, padding=1, bias=False)
         
