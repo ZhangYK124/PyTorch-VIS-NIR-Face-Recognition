@@ -397,7 +397,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 20.0 + g_cycle * 8.0 + g_adv * 5.0 + g_cam * 10.0 + g_cls * 5.0 + g_domain * 20.0
+                            g_loss = g_recon * 80.0 + g_cycle * 80.0 + g_adv * 5.0 + g_cam * 10.0 + g_cls * 40.0 + g_domain * 10.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
@@ -541,45 +541,45 @@ if __name__ == '__main__':
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             lr_schedule_D_DOMAIN.step()
-            
-            date = '20190919'
-            
-            torch.save({
-                'state_dict_Intrinsic_Encoder': Intrinsic_Encoder.state_dict(),
-                'epoch_Intrinsic_Encoder': epoch,
-            }, os.path.join(config.train['checkpoint'], 'Intrinsic_Encoder_' + date + '.pth'))
-            
-            torch.save({
-                'state_dict_Style_Encoder': Style_Encoder.state_dict(),
-                'epoch_Style_Encoder': epoch,
-            }, os.path.join(config.train['checkpoint'], 'Style_Encoder_' + date + '.pth'))
-            torch.save({
-                'state_dict_Integrator': Integrator.state_dict(),
-                'epoch_Integrator': epoch,
-            }, os.path.join(config.train['checkpoint'], 'Integrator_' + date + '.pth'))
-            torch.save({
-                'state_dict_D_VIS': D_VIS.state_dict(),
-                'epoch_D_VIS': epoch
-            }, os.path.join(config.train['checkpoint'], 'D_VIS_' + date + '.pth'))
-            torch.save({
-                'state_dict_D_NIR': D_NIR.state_dict(),
-                'epoch_D_NIR': epoch
-            }, os.path.join(config.train['checkpoint'], 'D_NIR_' + date + '.pth'))
-            torch.save({
-                'state_dict_D_SKETCH': D_SKETCH.state_dict(),
-                'epoch_D_SKETCH': epoch
-            }, os.path.join(config.train['checkpoint'], 'D_SKETCH_' + date + '.pth'))
-            torch.save({
-                'state_dict_D_DOMAIN': D_DOMAIN.state_dict(),
-                'epoch_D_DOMAIN': epoch
-            }, os.path.join(config.train['checkpoint'], 'D_DOMAIN_' + date + '.pth'))
-            torch.save(optimizer_G.state_dict(),
-                       os.path.join(config.train['checkpoint'], 'optimizer_G_' + date + '.pth'))
-            torch.save(optimizer_D_VIS.state_dict(),
-                       os.path.join(config.train['checkpoint'], 'optimizer_D_VIS_' + date + '.pth'))
-            torch.save(optimizer_D_NIR.state_dict(),
-                       os.path.join(config.train['checkpoint'], 'optimizer_D_NIR_' + date + '.pth'))
-            torch.save(optimizer_D_SKETCH.state_dict(),
-                       os.path.join(config.train['checkpoint'], 'optimizer_D_SKETCH_' + date + '.pth'))
-            torch.save(optimizer_D_DOMAIN.state_dict(),
-                       os.path.join(config.train['checkpoint'], 'optimizer_D_DOMAIN_' + date + '.pth'))
+            if epoch % 100 ==0:
+                date = '20190923'
+                
+                torch.save({
+                    'state_dict_Intrinsic_Encoder': Intrinsic_Encoder.state_dict(),
+                    'epoch_Intrinsic_Encoder': epoch,
+                }, os.path.join(config.train['checkpoint'], 'Intrinsic_Encoder_' + date + '.pth'))
+                
+                torch.save({
+                    'state_dict_Style_Encoder': Style_Encoder.state_dict(),
+                    'epoch_Style_Encoder': epoch,
+                }, os.path.join(config.train['checkpoint'], 'Style_Encoder_' + date + '.pth'))
+                torch.save({
+                    'state_dict_Integrator': Integrator.state_dict(),
+                    'epoch_Integrator': epoch,
+                }, os.path.join(config.train['checkpoint'], 'Integrator_' + date + '.pth'))
+                torch.save({
+                    'state_dict_D_VIS': D_VIS.state_dict(),
+                    'epoch_D_VIS': epoch
+                }, os.path.join(config.train['checkpoint'], 'D_VIS_' + date + '.pth'))
+                torch.save({
+                    'state_dict_D_NIR': D_NIR.state_dict(),
+                    'epoch_D_NIR': epoch
+                }, os.path.join(config.train['checkpoint'], 'D_NIR_' + date + '.pth'))
+                torch.save({
+                    'state_dict_D_SKETCH': D_SKETCH.state_dict(),
+                    'epoch_D_SKETCH': epoch
+                }, os.path.join(config.train['checkpoint'], 'D_SKETCH_' + date + '.pth'))
+                torch.save({
+                    'state_dict_D_DOMAIN': D_DOMAIN.state_dict(),
+                    'epoch_D_DOMAIN': epoch
+                }, os.path.join(config.train['checkpoint'], 'D_DOMAIN_' + date + '.pth'))
+                torch.save(optimizer_G.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_G_' + date + '.pth'))
+                torch.save(optimizer_D_VIS.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_D_VIS_' + date + '.pth'))
+                torch.save(optimizer_D_NIR.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_D_NIR_' + date + '.pth'))
+                torch.save(optimizer_D_SKETCH.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_D_SKETCH_' + date + '.pth'))
+                torch.save(optimizer_D_DOMAIN.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_D_DOMAIN_' + date + '.pth'))
