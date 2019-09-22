@@ -6,21 +6,21 @@ train['saparately'] = False
 train['epochs'] = 2000
 train['batch_size'] = 1
 train['num_workers'] = 0
-train['generator_steps'] = 2
+train['generator_steps'] = 3
 
 train['lambda_rec'] = 10.0
 train['lambda_gauss'] = 0.0001
 train['lambda_cls'] = 0.0
 
-train['lr_D'] = 8e-4
-train['lr_D_decay_epoch'] = 100
+train['lr_D'] = 1e-3
+train['lr_D_decay_epoch'] = 1000
 train['lr_D_decay_rate'] = 0.999
 train['beta1_D'] = 0.5
 train['beta2_D'] = 0.999
 train['weight_decay_D'] = 1e-5
 
-train['lr_G'] = 5e-4
-train['lr_G_decay_epoch'] = 100
+train['lr_G'] = 5e-3
+train['lr_G_decay_epoch'] = 1000
 train['lr_G_decay_rate'] = 0.999
 train['beta1_G'] = 0.5
 train['beta2_G'] = 0.999
@@ -29,7 +29,7 @@ train['weight_decay_G'] = 1e-5
 train['resume_G'] = None
 train['resume_Style_Encoder'] = None
 train['resume_D_VIS'] = None
-#
+
 # train['resume_optim_G'] = None
 # train['resume_optim_D'] = None
 
