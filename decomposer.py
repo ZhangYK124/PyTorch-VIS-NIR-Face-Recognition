@@ -380,15 +380,15 @@ if __name__ == '__main__':
                                        + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda())
                             
                             # adv loss & cam loss
-                            x_rec_adv, x_rec_adv_cam_logit, _ = D_X(x_rec)
-                            y_rec_adv, y_rec_adv_cam_logit, _ = D_Y(y_rec)
+                            # x_rec_adv, x_rec_adv_cam_logit, _ = D_X(x_rec)
+                            # y_rec_adv, y_rec_adv_cam_logit, _ = D_Y(y_rec)
                             
                             xy_adv, xy_adv_cam_logit, _ = D_Y(xy)
                             yx_adv, yx_adv_cam_logit, _ = D_X(yx)
                             
-                            g_adv = mse_loss(x_rec_adv, torch.ones_like(x_rec_adv).cuda()) + mse_loss(y_rec_adv, torch.ones_like(y_rec_adv).cuda())
-                            g_cam = mse_loss(x_rec_adv_cam_logit, torch.ones_like(x_rec_adv_cam_logit).cuda()) \
-                                    + mse_loss(y_rec_adv_cam_logit, torch.ones_like(y_rec_adv_cam_logit).cuda())
+                            g_adv = mse_loss(xy_adv, torch.ones_like(xy_adv).cuda()) + mse_loss(yx_adv, torch.ones_like(yx_adv).cuda())
+                            g_cam = mse_loss(xy_adv_cam_logit, torch.ones_like(xy_adv_cam_logit).cuda()) \
+                                    + mse_loss(yx_adv_cam_logit, torch.ones_like(yx_adv_cam_logit).cuda())
                             
                             # style cls loss
                             x_cls_label = label2onehot(x_style_logit, c_src)
@@ -397,7 +397,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 200.0 + g_cycle * 80.0 + g_adv * 50.0 + g_cam * 100.0 + g_cls * 50.0 + g_domain * 200.0
+                            g_loss = g_recon * 20.0 + g_cycle * 8.0 + g_adv * 5.0 + g_cam * 10.0 + g_cls * 5.0 + g_domain * 20.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
@@ -406,8 +406,8 @@ if __name__ == '__main__':
                         # =================================================================================== #
                         #                             2. Train the discriminator                              #
                         # =================================================================================== #
-                        x_rec_adv, x_rec_adv_cam_logit, _ = D_X(x_rec.detach())
-                        y_rec_adv, y_rec_adv_cam_logit, _ = D_Y(y_rec.detach())
+                        # x_rec_adv, x_rec_adv_cam_logit, _ = D_X(x_rec.detach())
+                        # y_rec_adv, y_rec_adv_cam_logit, _ = D_Y(y_rec.detach())
                         
                         xy_adv, xy_adv_cam_logit, _ = D_Y(xy.detach())
                         yx_adv, yx_adv_cam_logit, _ = D_X(yx.detach())
@@ -415,22 +415,20 @@ if __name__ == '__main__':
                         x_adv, x_adv_cam_logit, _ = D_X(x_real)
                         y_adv, y_adv_cam_logit, _ = D_Y(y_real)
                         
-                        d_X_adv = mse_loss(x_rec_adv, torch.zeros_like(x_rec_adv).cuda()) + mse_loss(yx_adv, torch.zeros_like(yx_adv).cuda()) \
+                        d_X_adv = mse_loss(yx_adv, torch.zeros_like(yx_adv).cuda()) \
                                   + mse_loss(x_adv, torch.ones_like(x_adv).cuda())
                         
-                        d_X_cam = mse_loss(x_rec_adv_cam_logit, torch.zeros_like(x_rec_adv_cam_logit)) \
-                                  + mse_loss(yx_adv_cam_logit, torch.zeros_like(yx_adv_cam_logit)) \
+                        d_X_cam = mse_loss(yx_adv_cam_logit, torch.zeros_like(yx_adv_cam_logit)) \
                                   + mse_loss(x_adv_cam_logit, torch.ones_like(x_adv_cam_logit))
                         
-                        d_Y_adv = mse_loss(y_rec_adv, torch.zeros_like(y_rec_adv).cuda()) + mse_loss(xy_adv, torch.zeros_like(xy_adv).cuda()) \
+                        d_Y_adv = mse_loss(xy_adv, torch.zeros_like(xy_adv).cuda()) \
                                   + mse_loss(y_adv, torch.ones_like(y_adv).cuda())
                         
-                        d_Y_cam = mse_loss(y_rec_adv_cam_logit, torch.zeros_like(y_rec_adv_cam_logit)) \
-                                  + mse_loss(xy_adv_cam_logit, torch.zeros_like(xy_adv_cam_logit).cuda()) \
+                        d_Y_cam = mse_loss(xy_adv_cam_logit, torch.zeros_like(xy_adv_cam_logit).cuda()) \
                                   + mse_loss(y_adv_cam_logit, torch.ones_like(y_adv_cam_logit))
                         
-                        d_loss_x = d_X_adv * 50.0 + d_X_cam * 100.0
-                        d_loss_y = d_Y_adv * 50.0 + d_Y_cam * 100.0
+                        d_loss_x = d_X_adv * 5.0 + d_X_cam * 10.0
+                        d_loss_y = d_Y_adv * 5.0 + d_Y_cam * 10.0
                         
                         x_intrinsic = Intrinsic_Encoder(x_real)
                         y_intrinsic = Intrinsic_Encoder(y_real)
@@ -455,7 +453,7 @@ if __name__ == '__main__':
                                    + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
                                    + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
                                    + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda())
-                        d_domain = d_domain * 1000.0
+                        d_domain = d_domain * 10.0
                         
                         # Backward and optimize.
                         optimizer_D_X.zero_grad()
