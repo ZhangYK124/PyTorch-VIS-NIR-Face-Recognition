@@ -19,7 +19,7 @@ train['beta1_D'] = 0.5
 train['beta2_D'] = 0.999
 train['weight_decay_D'] = 1e-5
 
-train['lr_G'] = 5e-3*0.5
+train['lr_G'] = 5e-3*0.5*0.8
 train['lr_G_decay_epoch'] = 500
 train['lr_G_decay_rate'] = 0.999
 train['beta1_G'] = 0.5
