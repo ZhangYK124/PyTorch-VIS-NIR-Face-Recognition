@@ -489,14 +489,26 @@ if __name__ == '__main__':
                         batches_left = config.train['epochs'] * len(trainLoader) - batches_done
                         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                         prev_time = time.time()
-                        
-                        bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f} | Loss_G: {loss_G:.6f} |' \
-                                     '  Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | Loss_D_DOMAIN: {loss_D_DOMAIN:.6f} | ETA: {time_left}'.format(
+
+                        bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f} |' \
+                                     '\n' \
+                                     ' Loss_G: {loss_G:.6f} | G_Recon: {g_recon:.6f} | G_Cyc: {g_cycle:.6f} | G_Adv: {g_adv:.6f} | G_Cam: {g_cam:.6f}}' \
+                                     'G_Cls: {g_cls:.6f} | G_Domain: {g_domain:.6f}' \
+                                     '\n' \
+                                     'Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | Loss_D_DOMAIN: {loss_D_DOMAIN:.6f} | ETA: {time_left}' \
+                                     '\n' \
+                                     '***************************************************************************'.format(
                             step=i,
                             epoch=epoch,
                             lr_G=lr_G,
                             lr_D=lr_D,
                             loss_G=losses_G.avg,
+                            g_recon=g_recon.data.cpu().numpy(),
+                            g_cycle=g_cycle.data.cpu().numpy(),
+                            g_adv=g_adv.data.cpu().numpy(),
+                            g_cam=g_cam.data.cpu().numpy(),
+                            g_cls=g_cls.data.cpu().numpy(),
+                            g_domain=g_domain.data.cpu().numpy(),
                             loss_D_VIS=losses_D_VIS.avg,
                             loss_D_NIR=losses_D_NIR.avg,
                             loss_D_SKETCH=losses_D_SKETCH.avg,
