@@ -104,15 +104,15 @@ if __name__ == '__main__':
     if config.train['resume_Style_Encoder']:
         checkpoint = torch.load(config.train['resume_Style_Encoder'])
         Style_Encoder.load_state_dict(checkpoint['state_dict_Style_Encoder'])
-        start_epoch = checkpoint['epoch_Style_Encoder']
+        start_epoch = checkpoint['epoch_Style_Encoder'] + 1
         
         checkpoint = torch.load(config.train['resume_Intrinsic_Encoder'])
         Intrinsic_Encoder.load_state_dict(checkpoint['state_dict_Intrinsic_Encoder'])
-        start_epoch = checkpoint['epoch_Intrinsic_Encoder']
+        start_epoch = checkpoint['epoch_Intrinsic_Encoder'] + 1
         
         checkpoint = torch.load(config.train['resume_Integrator'])
         Integrator.load_state_dict(checkpoint['state_dict_Integrator'])
-        start_epoch = checkpoint['epoch_Integrator']
+        start_epoch = checkpoint['epoch_Integrator'] + 1
         optim_checkpoint = torch.load(config.train['resume_optim_G'])
         optimizer_G.load_state_dict(optim_checkpoint)
         for state in optimizer_G.state.values():
@@ -139,7 +139,7 @@ if __name__ == '__main__':
         checkpoint = torch.load(config.train['resume_D_DOMAIN'])
         D_DOMAIN.load_state_dict(checkpoint['state_dict_D_DOMAIN'])
         
-        start_epoch = checkpoint['epoch_D_DOMAIN']
+        start_epoch = checkpoint['epoch_D_DOMAIN'] + 1
         
         optim_checkpoint_VIS = torch.load(config.train['resume_optim_D_VIS'])
         optimizer_D_VIS.load_state_dict(optim_checkpoint_VIS)
@@ -361,6 +361,9 @@ if __name__ == '__main__':
                             x_recon, x_recon_heatmap, x_recon_cam_logit = Integrator(xy_intrinsic, yx_style)
                             y_recon, y_recon_heatmap, y_recon_cam_logit = Integrator(yx_intrinsic, xy_style)
                             
+                            # intrinsic loss
+                            g_intrinsic = mse_loss(x_intrinsic,xy_intrinsic) + mse_loss(y_intrinsic,yx_intrinsic)
+                            
                             # reconstruction loss
                             g_recon = l1_loss(x_real, x_rec) + l1_loss(y_real, y_rec)
                             
@@ -397,7 +400,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 80.0 + g_cycle * 80.0 + g_adv * 5.0 + g_cam * 10.0 + g_cls * 40.0 + g_domain * 10.0
+                            g_loss = g_recon * 80.0 + g_cycle * 80.0 + g_adv * 10.0 + g_cam * 40.0 + g_cls * 40.0 + g_domain * 10.0 + g_intrinsic * 60.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
@@ -445,15 +448,6 @@ if __name__ == '__main__':
                         xy_intrinsic = Intrinsic_Encoder(xy)
                         yx_intrinsic = Intrinsic_Encoder(yx)
                         
-                        domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
-                        domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
-                        domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
-                        domain_cls4 = D_DOMAIN(y_intrinsic, xy_intrinsic)
-                        d_domain = mse_loss(domain_cls1, torch.zeros_like(domain_cls1).cuda()) \
-                                   + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
-                                   + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
-                                   + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda())
-                        d_domain = d_domain * 10.0
                         
                         # Backward and optimize.
                         optimizer_D_X.zero_grad()
@@ -464,9 +458,20 @@ if __name__ == '__main__':
                         d_loss_y.backward()
                         optimizer_D_Y.step()
                         
-                        optimizer_D_DOMAIN.zero_grad()
-                        d_domain.backward()
-                        optimizer_D_DOMAIN.step()
+                        if i%10==0:
+                            domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
+                            domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
+                            domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
+                            domain_cls4 = D_DOMAIN(y_intrinsic, xy_intrinsic)
+                            d_domain = mse_loss(domain_cls1, torch.zeros_like(domain_cls1).cuda()) \
+                                       + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
+                                       + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
+                                       + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda())
+                            d_domain = d_domain * 10.0
+    
+                            optimizer_D_DOMAIN.zero_grad()
+                            d_domain.backward()
+                            optimizer_D_DOMAIN.step()
                         
                         # =================================================================================== #
                         #                                 4. Miscellaneous                                    #
@@ -490,10 +495,10 @@ if __name__ == '__main__':
                         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                         prev_time = time.time()
 
-                        bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f} |' \
+                        bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f}' \
                                      '\n' \
-                                     ' Loss_G: {loss_G:.6f} | G_Recon: {g_recon:.6f} | G_Cyc: {g_cycle:.6f} | G_Adv: {g_adv:.6f} | G_Cam: {g_cam:.6f}}' \
-                                     'G_Cls: {g_cls:.6f} | G_Domain: {g_domain:.6f}' \
+                                     'Loss_G: {loss_G:.6f} | G_Recon: {g_recon:.6f} | G_Cyc: {g_cycle:.6f} | G_Adv: {g_adv:.6f} | G_Cam: {g_cam:.6f} ' \
+                                     '| G_Cls: {g_cls:.6f} | G_Domain: {g_domain:.6f} | G_Intrinsic: {g_intrinsic:.6f}' \
                                      '\n' \
                                      'Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | Loss_D_DOMAIN: {loss_D_DOMAIN:.6f} | ETA: {time_left}' \
                                      '\n' \
@@ -509,6 +514,7 @@ if __name__ == '__main__':
                             g_cam=g_cam.data.cpu().numpy(),
                             g_cls=g_cls.data.cpu().numpy(),
                             g_domain=g_domain.data.cpu().numpy(),
+                            g_intrinsic=g_intrinsic.data.cpu().numpy(),
                             loss_D_VIS=losses_D_VIS.avg,
                             loss_D_NIR=losses_D_NIR.avg,
                             loss_D_SKETCH=losses_D_SKETCH.avg,
@@ -520,10 +526,6 @@ if __name__ == '__main__':
                         
                         # Save Image
                         if i % count == 0:
-                            fake_y_single = xy.detach().cpu().numpy()[0]
-                            fake_y_single = tensor2numpy(fake_y_single)
-                            fake_y_single_name = '{}2{}_{}_{}.png'.format(src, tgt, epoch, i // count)
-                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
                             
                             fake_y_single = x_rec.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
@@ -534,11 +536,37 @@ if __name__ == '__main__':
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = 'cycle_{}_{}_{}.png'.format(src, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
+
+                            fake_y_single = xy.detach().cpu().numpy()[0]
+                            fake_y_single = tensor2numpy(fake_y_single)
+                            fake_y_single_name = '{}2{}_{}_{}.png'.format(src, tgt, epoch, i // count)
+                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
                             
                             heatmap_single = xy_heatmap.detach().cpu().numpy()[0]
                             heatmap_single = cam(tensor2numpy(heatmap_single), 112)
                             heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
                             heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(src, tgt, epoch, i // count)
+                            save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
+
+                            fake_y_single = y_rec.detach().cpu().numpy()[0]
+                            fake_y_single = tensor2numpy(fake_y_single)
+                            fake_y_single_name = 'recon_{}_{}_{}.png'.format(tgt, epoch, i // count)
+                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
+
+                            fake_y_single = y_recon.detach().cpu().numpy()[0]
+                            fake_y_single = tensor2numpy(fake_y_single)
+                            fake_y_single_name = 'cycle_{}_{}_{}.png'.format(tgt, epoch, i // count)
+                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
+
+                            fake_y_single = yx.detach().cpu().numpy()[0]
+                            fake_y_single = tensor2numpy(fake_y_single)
+                            fake_y_single_name = '{}2{}_{}_{}.png'.format(tgt, src, epoch, i // count)
+                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
+
+                            heatmap_single = yx_heatmap.detach().cpu().numpy()[0]
+                            heatmap_single = cam(tensor2numpy(heatmap_single), 112)
+                            heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
+                            heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(tgt, src, epoch, i // count)
                             save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
             
             # SummaryWriter
@@ -553,8 +581,8 @@ if __name__ == '__main__':
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             lr_schedule_D_DOMAIN.step()
-            if epoch % 100 ==0:
-                date = '20190923'
+            if epoch % 20 ==0:
+                date = '20190924'
                 
                 torch.save({
                     'state_dict_Intrinsic_Encoder': Intrinsic_Encoder.state_dict(),
