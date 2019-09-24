@@ -216,7 +216,7 @@ if __name__ == '__main__':
     
     prev_time = time.time()
     
-    count = int(len(trainLoader) // 1)
+    count = int(len(trainLoader) // 3)
     
     vis_buffer = ReplayBuffer()
     nir_buffer = ReplayBuffer()
@@ -562,11 +562,11 @@ if __name__ == '__main__':
                             fake_y_single_name = '{}2{}_{}_{}.png'.format(src, tgt, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
                             
-                            heatmap_single = xy_heatmap.detach().cpu().numpy()[0]
-                            heatmap_single = cam(tensor2numpy(heatmap_single), 112)
-                            heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
-                            heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(src, tgt, epoch, i // count)
-                            save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
+                            # heatmap_single = xy_heatmap.detach().cpu().numpy()[0]
+                            # heatmap_single = cam(tensor2numpy(heatmap_single), 112)
+                            # heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
+                            # heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(src, tgt, epoch, i // count)
+                            # save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
                             
                             fake_y_single = y_rec.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
@@ -583,11 +583,11 @@ if __name__ == '__main__':
                             fake_y_single_name = '{}2{}_{}_{}.png'.format(tgt, src, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
                             
-                            heatmap_single = yx_heatmap.detach().cpu().numpy()[0]
-                            heatmap_single = cam(tensor2numpy(heatmap_single), 112)
-                            heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
-                            heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(tgt, src, epoch, i // count)
-                            save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
+                            # heatmap_single = yx_heatmap.detach().cpu().numpy()[0]
+                            # heatmap_single = cam(tensor2numpy(heatmap_single), 112)
+                            # heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
+                            # heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(tgt, src, epoch, i // count)
+                            # save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
             
             # SummaryWriter
             writer_loss_G_epochs.add_scalar('epochs/loss_G', losses_G.avg, epoch)
@@ -601,7 +601,7 @@ if __name__ == '__main__':
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             lr_schedule_D_DOMAIN.step()
-            if epoch % 20 == 0:
+            if epoch % 1 == 0:
                 date = '20190924'
                 
                 torch.save({
