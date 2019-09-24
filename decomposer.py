@@ -362,7 +362,7 @@ if __name__ == '__main__':
                             y_recon, y_recon_heatmap, y_recon_cam_logit = Integrator(yx_intrinsic, xy_style)
                             
                             # intrinsic loss
-                            g_intrinsic = mse_loss(x_intrinsic,xy_intrinsic) + mse_loss(y_intrinsic,yx_intrinsic)
+                            g_intrinsic = mse_loss(x_intrinsic, xy_intrinsic) + mse_loss(y_intrinsic, yx_intrinsic)
                             
                             # reconstruction loss
                             g_recon = l1_loss(x_real, x_rec) + l1_loss(y_real, y_rec)
@@ -400,7 +400,7 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 80.0 + g_cycle * 80.0 + g_adv * 10.0 + g_cam * 40.0 + g_cls * 40.0 + g_domain * 10.0 + g_intrinsic * 60.0
+                            g_loss = g_recon * 80.0 + g_cycle * 80.0 + g_adv * 10.0 + g_cam * 40.0 + g_cls * 40.0 + g_domain * 10.0 + g_intrinsic * 20.0
                             
                             optimizer_G.zero_grad()
                             g_loss.backward()
@@ -415,24 +415,55 @@ if __name__ == '__main__':
                         xy_adv, xy_adv_cam_logit, _ = D_Y(xy.detach())
                         yx_adv, yx_adv_cam_logit, _ = D_X(yx.detach())
                         
+                        d_X_adv_fake = mse_loss(yx_adv, torch.zeros_like(yx_adv).cuda())
+                        
+                        d_X_cam_fake = mse_loss(yx_adv_cam_logit, torch.zeros_like(yx_adv_cam_logit))
+                        
+                        d_Y_adv_fake = mse_loss(xy_adv, torch.zeros_like(xy_adv).cuda())
+                        
+                        d_Y_cam_fake = mse_loss(xy_adv_cam_logit, torch.zeros_like(xy_adv_cam_logit).cuda())
+                        
+                        d_loss_x_fake = d_X_adv_fake * 5.0 + d_X_cam_fake * 10.0
+                        d_loss_y_fake = d_Y_adv_fake * 5.0 + d_Y_cam_fake * 10.0
+                        
+                        # Backward and optimize.
+                        optimizer_D_X.zero_grad()
+                        d_loss_x_fake.backward()
+                        optimizer_D_X.step()
+                        
+                        optimizer_D_Y.zero_grad()
+                        d_loss_y_fake.backward()
+                        optimizer_D_Y.step()
+                        
                         x_adv, x_adv_cam_logit, _ = D_X(x_real)
                         y_adv, y_adv_cam_logit, _ = D_Y(y_real)
                         
-                        d_X_adv = mse_loss(yx_adv, torch.zeros_like(yx_adv).cuda()) \
-                                  + mse_loss(x_adv, torch.ones_like(x_adv).cuda())
+                        d_X_adv_real = mse_loss(x_adv, torch.ones_like(x_adv).cuda())
                         
-                        d_X_cam = mse_loss(yx_adv_cam_logit, torch.zeros_like(yx_adv_cam_logit)) \
-                                  + mse_loss(x_adv_cam_logit, torch.ones_like(x_adv_cam_logit))
+                        d_X_cam_real = mse_loss(x_adv_cam_logit, torch.ones_like(x_adv_cam_logit))
                         
-                        d_Y_adv = mse_loss(xy_adv, torch.zeros_like(xy_adv).cuda()) \
-                                  + mse_loss(y_adv, torch.ones_like(y_adv).cuda())
+                        d_Y_adv_real = mse_loss(y_adv, torch.ones_like(y_adv).cuda())
                         
-                        d_Y_cam = mse_loss(xy_adv_cam_logit, torch.zeros_like(xy_adv_cam_logit).cuda()) \
-                                  + mse_loss(y_adv_cam_logit, torch.ones_like(y_adv_cam_logit))
+                        d_Y_cam_real = mse_loss(y_adv_cam_logit, torch.ones_like(y_adv_cam_logit))
                         
-                        d_loss_x = d_X_adv * 5.0 + d_X_cam * 10.0
-                        d_loss_y = d_Y_adv * 5.0 + d_Y_cam * 10.0
+                        d_loss_x_real = d_X_adv_real * 5.0 + d_X_cam_real * 10.0
+                        d_loss_y_real = d_Y_adv_real * 5.0 + d_Y_cam_real * 10.0
                         
+                        # Backward and optimize.
+                        optimizer_D_X.zero_grad()
+                        d_loss_x_real.backward()
+                        optimizer_D_X.step()
+                        
+                        optimizer_D_Y.zero_grad()
+                        d_loss_y_real.backward()
+                        optimizer_D_Y.step()
+                        
+                        d_loss_x = d_loss_x_fake + d_loss_x_real
+                        d_loss_y = d_loss_y_fake + d_loss_y_real
+                        
+                        # =================================================================================== #
+                        #                          3. Train the domain discriminator                          #
+                        # =================================================================================== #
                         x_intrinsic = Intrinsic_Encoder(x_real)
                         y_intrinsic = Intrinsic_Encoder(y_real)
                         
@@ -448,17 +479,7 @@ if __name__ == '__main__':
                         xy_intrinsic = Intrinsic_Encoder(xy)
                         yx_intrinsic = Intrinsic_Encoder(yx)
                         
-                        
-                        # Backward and optimize.
-                        optimizer_D_X.zero_grad()
-                        d_loss_x.backward()
-                        optimizer_D_X.step()
-                        
-                        optimizer_D_Y.zero_grad()
-                        d_loss_y.backward()
-                        optimizer_D_Y.step()
-                        
-                        if i%10==0:
+                        if i % 5 == 0:
                             domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
                             domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
                             domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
@@ -467,10 +488,10 @@ if __name__ == '__main__':
                                        + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
                                        + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
                                        + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda())
-                            d_domain = d_domain * 10.0
-    
+                            d_domain1 = d_domain * 10.0
+                            
                             optimizer_D_DOMAIN.zero_grad()
-                            d_domain.backward()
+                            d_domain1.backward()
                             optimizer_D_DOMAIN.step()
                         
                         # =================================================================================== #
@@ -494,7 +515,7 @@ if __name__ == '__main__':
                         batches_left = config.train['epochs'] * len(trainLoader) - batches_done
                         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                         prev_time = time.time()
-
+                        
                         bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f}' \
                                      '\n' \
                                      'Loss_G: {loss_G:.6f} | G_Recon: {g_recon:.6f} | G_Cyc: {g_cycle:.6f} | G_Adv: {g_adv:.6f} | G_Cam: {g_cam:.6f} ' \
@@ -526,7 +547,6 @@ if __name__ == '__main__':
                         
                         # Save Image
                         if i % count == 0:
-                            
                             fake_y_single = x_rec.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = 'recon_{}_{}_{}.png'.format(src, epoch, i // count)
@@ -536,7 +556,7 @@ if __name__ == '__main__':
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = 'cycle_{}_{}_{}.png'.format(src, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
-
+                            
                             fake_y_single = xy.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = '{}2{}_{}_{}.png'.format(src, tgt, epoch, i // count)
@@ -547,22 +567,22 @@ if __name__ == '__main__':
                             heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
                             heatmap_single_name = '{}2{}_heatmap_{}_{}.png'.format(src, tgt, epoch, i // count)
                             save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
-
+                            
                             fake_y_single = y_rec.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = 'recon_{}_{}_{}.png'.format(tgt, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
-
+                            
                             fake_y_single = y_recon.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = 'cycle_{}_{}_{}.png'.format(tgt, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
-
+                            
                             fake_y_single = yx.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = '{}2{}_{}_{}.png'.format(tgt, src, epoch, i // count)
                             save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
-
+                            
                             heatmap_single = yx_heatmap.detach().cpu().numpy()[0]
                             heatmap_single = cam(tensor2numpy(heatmap_single), 112)
                             heatmap_single = heatmap_single * 0.5 + fake_y_single * 0.5
@@ -581,7 +601,7 @@ if __name__ == '__main__':
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             lr_schedule_D_DOMAIN.step()
-            if epoch % 20 ==0:
+            if epoch % 20 == 0:
                 date = '20190924'
                 
                 torch.save({
