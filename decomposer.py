@@ -96,10 +96,22 @@ if __name__ == '__main__':
     optimizer_D_SKETCH = torch.optim.Adam(D_SKETCH.parameters(), lr=config.train['lr_D'],
                                           betas=(config.train['beta1_D'], config.train['beta2_D']),
                                           weight_decay=config.train['weight_decay_D'])
-    optimizer_G = torch.optim.Adam(itertools.chain(Style_Encoder.parameters(), Intrinsic_Encoder.parameters(), Integrator.parameters()),
-                                   lr=config.train['lr_G'],
-                                   betas=(config.train['beta1_G'], config.train['beta2_G']),
-                                   weight_decay=config.train['weight_decay_G'])
+    # optimizer_G = torch.optim.Adam(itertools.chain(Style_Encoder.parameters(), Intrinsic_Encoder.parameters(), Integrator.parameters()),
+    #                                lr=config.train['lr_G'],
+    #                                betas=(config.train['beta1_G'], config.train['beta2_G']),
+    #                                weight_decay=config.train['weight_decay_G'])
+    optimizer_Style = torch.optim.Adam(Style_Encoder.parameters(),
+                                       lr = config.train['lr_G'],
+                                       betas=(config.train['beta1_G'],config.train['beta2_G']),
+                                       weight_decay=config.train['weight_decay_G'])
+    optimizer_Intrinsic = torch.optim.Adam(Intrinsic_Encoder.parameters(),
+                                       lr=config.train['lr_G'],
+                                       betas=(config.train['beta1_G'], config.train['beta2_G']),
+                                       weight_decay=config.train['weight_decay_G'])
+    optimizer_Integrator = torch.optim.Adam(Integrator.parameters(),
+                                       lr=config.train['lr_G'],
+                                       betas=(config.train['beta1_G'], config.train['beta2_G']),
+                                       weight_decay=config.train['weight_decay_G'])
     
     if config.train['resume_Style_Encoder']:
         checkpoint = torch.load(config.train['resume_Style_Encoder'])
@@ -191,8 +203,23 @@ if __name__ == '__main__':
         mse_loss.cuda()
         cross_entropy.cuda()
     
-    # LR Schedulers
-    lr_schedule_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(config.train['epochs'],
+    # ################################       LR Schedulers           ################################
+    # lr_schedule_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(config.train['epochs'],
+    #                                                                                   config.train['lr_G_decay_rate'],
+    #                                                                                   config.train['lr_G_decay_epoch'],
+    #                                                                                   config.train['lr_G']).step)
+
+    lr_schedule_Style = torch.optim.lr_scheduler.LambdaLR(optimizer_Style, lr_lambda=LambdaLR(config.train['epochs'],
+                                                                                      config.train['lr_G_decay_rate'],
+                                                                                      config.train['lr_G_decay_epoch'],
+                                                                                      config.train['lr_G']).step)
+
+    lr_schedule_Intrinsic = torch.optim.lr_scheduler.LambdaLR(optimizer_Intrinsic, lr_lambda=LambdaLR(config.train['epochs'],
+                                                                                      config.train['lr_G_decay_rate'],
+                                                                                      config.train['lr_G_decay_epoch'],
+                                                                                      config.train['lr_G']).step)
+
+    lr_schedule_Integrator = torch.optim.lr_scheduler.LambdaLR(optimizer_Integrator, lr_lambda=LambdaLR(config.train['epochs'],
                                                                                       config.train['lr_G_decay_rate'],
                                                                                       config.train['lr_G_decay_epoch'],
                                                                                       config.train['lr_G']).step)
@@ -201,14 +228,17 @@ if __name__ == '__main__':
                                                                                               config.train['lr_D_decay_rate'],
                                                                                               config.train['lr_D_decay_epoch'],
                                                                                               config.train['lr_D']).step)
+    
     lr_schedule_D_NIR = torch.optim.lr_scheduler.LambdaLR(optimizer_D_NIR, lr_lambda=LambdaLR(config.train['epochs'],
                                                                                               config.train['lr_D_decay_rate'],
                                                                                               config.train['lr_D_decay_epoch'],
                                                                                               config.train['lr_D']).step)
+    
     lr_schedule_D_SKETCH = torch.optim.lr_scheduler.LambdaLR(optimizer_D_SKETCH, lr_lambda=LambdaLR(config.train['epochs'],
                                                                                                     config.train['lr_D_decay_rate'],
                                                                                                     config.train['lr_D_decay_epoch'],
                                                                                                     config.train['lr_D']).step)
+    
     lr_schedule_D_DOMAIN = torch.optim.lr_scheduler.LambdaLR(optimizer_D_DOMAIN, lr_lambda=LambdaLR(config.train['epochs'],
                                                                                                     config.train['lr_D_decay_rate'],
                                                                                                     config.train['lr_D_decay_epoch'],
@@ -216,14 +246,17 @@ if __name__ == '__main__':
     
     prev_time = time.time()
     
-    count = int(len(trainLoader) // 3)
+    count = int(len(trainLoader) // config.train['save_img_num'])
     
     vis_buffer = ReplayBuffer()
     nir_buffer = ReplayBuffer()
     sketch_buffer = ReplayBuffer()
     
     print('***************** Save Image Iteration: {} ********************'.format(count))
-    writer_loss_G_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_G')
+    # writer_loss_G_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_G')
+    writer_loss_Intrinsic_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_Intrinsic')
+    writer_loss_Style_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_Style')
+    writer_loss_Integrator_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_Integrator')
     writer_loss_D_VIS_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_VIS')
     writer_loss_D_NIR_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_NIR')
     writer_loss_D_SKETCH_epochs = SummaryWriter(config.train['logs'] + 'epochs/loss_D_SKETCH')
@@ -232,7 +265,10 @@ if __name__ == '__main__':
     # Training
     if config.train['if_train']:
         for epoch in range(start_epoch, config.train['epochs']):
-            writer_loss_G_steps = SummaryWriter(config.train['logs'] + 'steps/loss_G')
+            # writer_loss_G_steps = SummaryWriter(config.train['logs'] + 'steps/loss_G')
+            writer_loss_Intrinsic_steps = SummaryWriter(config.train['logs'] + 'steps/loss_Intrinsic')
+            writer_loss_Style_steps = SummaryWriter(config.train['logs'] + 'steps/loss_Style')
+            writer_loss_Integrator_steps = SummaryWriter(config.train['logs'] + 'steps/loss_Integrator')
             writer_loss_D_VIS_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_VIS')
             writer_loss_D_NIR_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_NIR')
             writer_loss_D_SKETCH_steps = SummaryWriter(config.train['logs'] + 'steps/loss_D_SKETCH')
@@ -248,7 +284,10 @@ if __name__ == '__main__':
             
             batch_time = AverageMeter()
             data_time = AverageMeter()
-            losses_G = AverageMeter()
+            # losses_G = AverageMeter()
+            losses_Intrinsic = AverageMeter()
+            losses_Style = AverageMeter()
+            losses_Integrator = AverageMeter()
             losses_D_VIS = AverageMeter()
             losses_D_NIR = AverageMeter()
             losses_D_SKETCH = AverageMeter()
@@ -354,33 +393,38 @@ if __name__ == '__main__':
                             
                             xy_intrinsic = Intrinsic_Encoder(xy)
                             yx_intrinsic = Intrinsic_Encoder(yx)
+                            # yx_intrinsic = Intrinsic_Encoder(x_real)
                             
                             xy_style, xy_style_logit = Style_Encoder(xy)
                             yx_style, yx_style_logit = Style_Encoder(yx)
+                            # yx_style, yx_style_logit = Style_Encoder(x_real)
                             
                             x_recon, x_recon_heatmap, x_recon_cam_logit = Integrator(xy_intrinsic, yx_style)
                             y_recon, y_recon_heatmap, y_recon_cam_logit = Integrator(yx_intrinsic, xy_style)
+
+                            # x_recon, x_recon_heatmap, x_recon_cam_logit = Integrator(xy_intrinsic, x_style)
+                            # y_recon, y_recon_heatmap, y_recon_cam_logit = Integrator(yx_intrinsic, y_style)
                             
                             # intrinsic loss
                             g_intrinsic = mse_loss(x_intrinsic, xy_intrinsic) + mse_loss(y_intrinsic, yx_intrinsic)
                             
                             # reconstruction loss
-                            g_recon = l1_loss(x_real, x_rec) + l1_loss(y_real, y_rec)
+                            g_recon =l1_loss(x_real, x_rec) +l1_loss(y_real, y_rec)
                             
                             # cycle consistency loss
-                            g_cycle = l1_loss(x_real, x_recon) + l1_loss(y_real, y_recon)
+                            g_cycle =l1_loss(x_real, x_recon) +l1_loss(y_real, y_recon)
                             
-                            # # mmd loss
-                            # g_mmd = mmd(x_intrinsic, y_intrinsic) + mmd(xy_intrinsic, yx_intrinsic) + mmd(x_intrinsic, yx_intrinsic) + mmd(
-                            #     y_intrinsic, xy_intrinsic)
-                            domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
-                            domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
-                            domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
-                            domain_cls4 = D_DOMAIN(y_intrinsic, xy_intrinsic)
-                            g_domain = mse_loss(domain_cls1, torch.ones_like(domain_cls1).cuda()) \
-                                       + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda()) \
-                                       + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda()) \
-                                       + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda())
+                            # mmd loss
+                            g_mmd = mmd(x_intrinsic, y_intrinsic) + mmd(xy_intrinsic, yx_intrinsic) + mmd(x_intrinsic, yx_intrinsic) + mmd(y_intrinsic, xy_intrinsic)
+                            
+                            # domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
+                            # domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
+                            # domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
+                            # domain_cls4 = D_DOMAIN(y_intrinsic, xy_intrinsic)
+                            # g_domain = mse_loss(domain_cls1, torch.ones_like(domain_cls1).cuda()) \
+                            #            + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda()) \
+                            #            + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda()) \
+                            #            + mse_loss(domain_cls2, torch.ones_like(domain_cls2).cuda())
                             
                             # adv loss & cam loss
                             # x_rec_adv, x_rec_adv_cam_logit, _ = D_X(x_rec)
@@ -400,11 +444,29 @@ if __name__ == '__main__':
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
                                     + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
                             
-                            g_loss = g_recon * 80.0 + g_cycle * 80.0 + g_adv * 10.0 + g_cam * 40.0 + g_cls * 40.0 + g_domain * 10.0 + g_intrinsic * 20.0
+                            # total loss
+                            # g_loss = g_recon * 10.0 * 255.0 + g_cycle * 10.0 * 255.0 + g_adv * 1.0 * 0.0 + g_cam * 10.0 * 0.0 + g_cls * 1.0 + g_domain * 0.0 + g_intrinsic * 1.0 * 0.0
+
+                            # optimizer_G.zero_grad()
+                            # g_loss.backward()
+                            # optimizer_G.step()
                             
-                            optimizer_G.zero_grad()
-                            g_loss.backward()
-                            optimizer_G.step()
+                            intrinsic_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv + g_cam * 10.0 + g_mmd + g_intrinsic
+                            style_loss = g_cls
+                            integrator_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv + g_cam * 10.0
+                            
+                            optimizer_Intrinsic.zero_grad()
+                            intrinsic_loss.backward(retain_graph=True)
+                            optimizer_Intrinsic.step()
+                            
+                            optimizer_Style.zero_grad()
+                            style_loss.backward(retain_graph=True)
+                            optimizer_Style.step()
+                            
+                            optimizer_Integrator.zero_grad()
+                            integrator_loss.backward()
+                            optimizer_Integrator.step()
+                            
                         
                         # =================================================================================== #
                         #                             2. Train the discriminator                              #
@@ -423,8 +485,8 @@ if __name__ == '__main__':
                         
                         d_Y_cam_fake = mse_loss(xy_adv_cam_logit, torch.zeros_like(xy_adv_cam_logit).cuda())
                         
-                        d_loss_x_fake = d_X_adv_fake * 5.0 + d_X_cam_fake * 10.0
-                        d_loss_y_fake = d_Y_adv_fake * 5.0 + d_Y_cam_fake * 10.0
+                        d_loss_x_fake = d_X_adv_fake * 1.0 + d_X_cam_fake * 10.0
+                        d_loss_y_fake = d_Y_adv_fake * 1.0 + d_Y_cam_fake * 10.0
                         
                         # Backward and optimize.
                         optimizer_D_X.zero_grad()
@@ -446,8 +508,8 @@ if __name__ == '__main__':
                         
                         d_Y_cam_real = mse_loss(y_adv_cam_logit, torch.ones_like(y_adv_cam_logit))
                         
-                        d_loss_x_real = d_X_adv_real * 5.0 + d_X_cam_real * 10.0
-                        d_loss_y_real = d_Y_adv_real * 5.0 + d_Y_cam_real * 10.0
+                        d_loss_x_real = d_X_adv_real * 1.0 + d_X_cam_real * 10.0
+                        d_loss_y_real = d_Y_adv_real * 1.0 + d_Y_cam_real * 10.0
                         
                         # Backward and optimize.
                         optimizer_D_X.zero_grad()
@@ -458,28 +520,29 @@ if __name__ == '__main__':
                         d_loss_y_real.backward()
                         optimizer_D_Y.step()
                         
-                        d_loss_x = d_loss_x_fake + d_loss_x_real
-                        d_loss_y = d_loss_y_fake + d_loss_y_real
+                        d_loss_x = d_X_adv_real + d_X_adv_fake
+                        d_loss_y = d_Y_adv_real + d_Y_adv_fake
                         
+                        '''
                         # =================================================================================== #
                         #                          3. Train the domain discriminator                          #
                         # =================================================================================== #
                         x_intrinsic = Intrinsic_Encoder(x_real)
                         y_intrinsic = Intrinsic_Encoder(y_real)
-                        
+
                         x_style, x_style_logit = Style_Encoder(x_real)
                         y_style, y_style_logit = Style_Encoder(y_real)
-                        
+
                         # x_rec, x_rec_heatmap, x_cam_logit = Integrator(x_intrinsic, x_style)
                         # y_rec, y_rec_heatmap, y_cam_logit = Integrator(y_intrinsic, y_style)
-                        
+
                         xy, xy_heatmap, xy_cam_logit = Integrator(x_intrinsic, y_style)
                         yx, yx_heatmap, yx_cam_logit = Integrator(y_intrinsic, x_style)
-                        
+
                         xy_intrinsic = Intrinsic_Encoder(xy)
                         yx_intrinsic = Intrinsic_Encoder(yx)
-                        
-                        if i % 5 == 0:
+
+                        if i % 10 == 0:
                             domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
                             domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
                             domain_cls3 = D_DOMAIN(x_intrinsic, yx_intrinsic)
@@ -488,22 +551,29 @@ if __name__ == '__main__':
                                        + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
                                        + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda()) \
                                        + mse_loss(domain_cls2, torch.zeros_like(domain_cls2).cuda())
-                            d_domain1 = d_domain * 10.0
-                            
+                            d_domain1 = d_domain * 1.0
+
                             optimizer_D_DOMAIN.zero_grad()
                             d_domain1.backward()
                             optimizer_D_DOMAIN.step()
+                        '''
                         
                         # =================================================================================== #
                         #                                 4. Miscellaneous                                    #
                         # =================================================================================== #
-                        losses_G.update(g_loss.data.cpu().numpy(), config.train['batch_size'])
+                        # losses_G.update(g_loss.data.cpu().numpy(), config.train['batch_size'])
+                        losses_Intrinsic.update(intrinsic_loss.data.cpu().numpy(), config.train['batch_size'])
+                        losses_Style.update(style_loss.data.cpu().numpy(), config.train['batch_size'])
+                        losses_Integrator.update(integrator_loss.data.cpu().numpy(), config.train['batch_size'])
                         losses_D_X.update(d_loss_x.data.cpu().numpy(), config.train['batch_size'])
                         losses_D_Y.update(d_loss_y.data.cpu().numpy(), config.train['batch_size'])
-                        losses_D_DOMAIN.update(d_domain.data.cpu().numpy(), config.train['batch_size'])
+                        # losses_D_DOMAIN.update(d_domain.data.cpu().numpy(), config.train['batch_size'])
                         
                         # SummaryWriter
-                        writer_loss_G_steps.add_scalar('steps/loss_G', losses_G.avg, i)
+                        # writer_loss_G_steps.add_scalar('steps/loss_G', losses_G.avg, i)
+                        writer_loss_Intrinsic_steps.add_scalar('steps/loss_Intrinsic', losses_Intrinsic.avg, i)
+                        writer_loss_Style_steps.add_scalar('steps/loss_Style', losses_Style.avg, i)
+                        writer_loss_Integrator_steps.add_scalar('steps/loss_G', losses_Integrator.avg, i)
                         writer_loss_D_X_steps.add_scalar('steps/loss_D_' + src, losses_D_X.avg, i)
                         writer_loss_D_Y_steps.add_scalar('steps/loss_D_' + tgt, losses_D_Y.avg, i)
                         writer_loss_D_DOMAIN_steps.add_scalar('steps/loss_D_DOMAIN', losses_D_DOMAIN.avg, i)
@@ -518,8 +588,8 @@ if __name__ == '__main__':
                         
                         bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.8f} | LR_D: {lr_D:.8f}' \
                                      '\n' \
-                                     'Loss_G: {loss_G:.6f} | G_Recon: {g_recon:.6f} | G_Cyc: {g_cycle:.6f} | G_Adv: {g_adv:.6f} | G_Cam: {g_cam:.6f} ' \
-                                     '| G_Cls: {g_cls:.6f} | G_Domain: {g_domain:.6f} | G_Intrinsic: {g_intrinsic:.6f}' \
+                                     'Loss_intrinsic: {loss_intrinsic:.6f} | Loss_style: {loss_style:.6f} | Loss_integrator: {loss_integrator:.6f} | G_Recon: {g_recon:.6f} | G_Cyc: {g_cycle:.6f} | G_Adv: {g_adv:.6f} | G_Cam: {g_cam:.6f} ' \
+                                     '| G_Cls: {g_cls:.6f} | G_Intrinsic: {g_intrinsic:.6f}' \
                                      '\n' \
                                      'Loss_D_VIS: {loss_D_VIS:.6f} | Loss_D_NIR: {loss_D_NIR:.6f} | Loss_D_SKETCH: {loss_D_SKETCH:.6f} | Loss_D_DOMAIN: {loss_D_DOMAIN:.6f} | ETA: {time_left}' \
                                      '\n' \
@@ -528,13 +598,16 @@ if __name__ == '__main__':
                             epoch=epoch,
                             lr_G=lr_G,
                             lr_D=lr_D,
-                            loss_G=losses_G.avg,
+                            # loss_G=losses_G.avg,
+                            loss_intrinsic=losses_Intrinsic.avg,
+                            loss_style=losses_Style.avg,
+                            loss_integrator=losses_Integrator.avg,
                             g_recon=g_recon.data.cpu().numpy(),
                             g_cycle=g_cycle.data.cpu().numpy(),
                             g_adv=g_adv.data.cpu().numpy(),
                             g_cam=g_cam.data.cpu().numpy(),
                             g_cls=g_cls.data.cpu().numpy(),
-                            g_domain=g_domain.data.cpu().numpy(),
+                            # g_domain=g_domain.data.cpu().numpy(),
                             g_intrinsic=g_intrinsic.data.cpu().numpy(),
                             loss_D_VIS=losses_D_VIS.avg,
                             loss_D_NIR=losses_D_NIR.avg,
@@ -547,6 +620,16 @@ if __name__ == '__main__':
                         
                         # Save Image
                         if i % count == 0:
+                            fake_y_single = x_real.detach().cpu().numpy()[0]
+                            fake_y_single = tensor2numpy(fake_y_single)
+                            fake_y_single_name = 'real_{}_{}_{}.png'.format(src, epoch, i // count)
+                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
+                            
+                            fake_y_single = y_real.detach().cpu().numpy()[0]
+                            fake_y_single = tensor2numpy(fake_y_single)
+                            fake_y_single_name = 'real_{}_{}_{}.png'.format(tgt, epoch, i // count)
+                            save_image_single(fake_y_single, config.train['out'] + fake_y_single_name)
+                            
                             fake_y_single = x_rec.detach().cpu().numpy()[0]
                             fake_y_single = tensor2numpy(fake_y_single)
                             fake_y_single_name = 'recon_{}_{}_{}.png'.format(src, epoch, i // count)
@@ -590,18 +673,24 @@ if __name__ == '__main__':
                             # save_image_single(heatmap_single, config.train['out'] + heatmap_single_name)
             
             # SummaryWriter
-            writer_loss_G_epochs.add_scalar('epochs/loss_G', losses_G.avg, epoch)
+            # writer_loss_G_epochs.add_scalar('epochs/loss_G', losses_G.avg, epoch)
+            writer_loss_Integrator_epochs.add_scalar('epochs/loss_Integrator', losses_Integrator.avg, epoch)
+            writer_loss_Intrinsic_epochs.add_scalar('epochs/loss_Intrinsic', losses_Intrinsic.avg, epoch)
+            writer_loss_Style_epochs.add_scalar('epochs/loss_Style', losses_Style.avg, epoch)
             writer_loss_D_SKETCH_epochs.add_scalar('epochs/loss_D_SKETCH', losses_D_SKETCH.avg, epoch)
             writer_loss_D_VIS_epochs.add_scalar('epochs/loss_D_VIS', losses_D_VIS.avg, epoch)
             writer_loss_D_NIR_epochs.add_scalar('epochs/loss_D_NIR', losses_D_NIR.avg, epoch)
             writer_loss_D_DOMAIN_epochs.add_scalar('epochs/loss_D_DOMAIN', losses_D_DOMAIN.avg, epoch)
             
-            lr_schedule_G.step()
+            # lr_schedule_G.step()
+            lr_schedule_Intrinsic.step()
+            lr_schedule_Style.step()
+            lr_schedule_Integrator.step()
             lr_schedule_D_VIS.step()
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             lr_schedule_D_DOMAIN.step()
-            if epoch % 1 == 0:
+            if epoch % 10 == 0:
                 date = '20190924'
                 
                 torch.save({
@@ -629,17 +718,23 @@ if __name__ == '__main__':
                     'state_dict_D_SKETCH': D_SKETCH.state_dict(),
                     'epoch_D_SKETCH': epoch
                 }, os.path.join(config.train['checkpoint'], 'D_SKETCH_' + date + '.pth'))
-                torch.save({
-                    'state_dict_D_DOMAIN': D_DOMAIN.state_dict(),
-                    'epoch_D_DOMAIN': epoch
-                }, os.path.join(config.train['checkpoint'], 'D_DOMAIN_' + date + '.pth'))
-                torch.save(optimizer_G.state_dict(),
-                           os.path.join(config.train['checkpoint'], 'optimizer_G_' + date + '.pth'))
+                # torch.save({
+                #     'state_dict_D_DOMAIN': D_DOMAIN.state_dict(),
+                #     'epoch_D_DOMAIN': epoch
+                # }, os.path.join(config.train['checkpoint'], 'D_DOMAIN_' + date + '.pth'))
+                # torch.save(optimizer_G.state_dict(),
+                #            os.path.join(config.train['checkpoint'], 'optimizer_G_' + date + '.pth'))
+                torch.save(optimizer_Intrinsic.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_Intrinsic_' + date + '.pth'))
+                torch.save(optimizer_Style.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_Style_' + date + '.pth'))
+                torch.save(optimizer_Integrator.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_Integrator_' + date + '.pth'))
                 torch.save(optimizer_D_VIS.state_dict(),
                            os.path.join(config.train['checkpoint'], 'optimizer_D_VIS_' + date + '.pth'))
                 torch.save(optimizer_D_NIR.state_dict(),
                            os.path.join(config.train['checkpoint'], 'optimizer_D_NIR_' + date + '.pth'))
                 torch.save(optimizer_D_SKETCH.state_dict(),
                            os.path.join(config.train['checkpoint'], 'optimizer_D_SKETCH_' + date + '.pth'))
-                torch.save(optimizer_D_DOMAIN.state_dict(),
-                           os.path.join(config.train['checkpoint'], 'optimizer_D_DOMAIN_' + date + '.pth'))
+                # torch.save(optimizer_D_DOMAIN.state_dict(),
+                #            os.path.join(config.train['checkpoint'], 'optimizer_D_DOMAIN_' + date + '.pth'))
