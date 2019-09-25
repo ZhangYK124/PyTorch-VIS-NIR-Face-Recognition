@@ -117,17 +117,29 @@ if __name__ == '__main__':
         checkpoint = torch.load(config.train['resume_Style_Encoder'])
         Style_Encoder.load_state_dict(checkpoint['state_dict_Style_Encoder'])
         start_epoch = checkpoint['epoch_Style_Encoder'] + 1
+        optim_checkpoint = torch.load(config.train['resume_optim_Style'])
+        optimizer_Style.load_state_dict(optim_checkpoint)
+        for state in optimizer_Style.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
         
         checkpoint = torch.load(config.train['resume_Intrinsic_Encoder'])
         Intrinsic_Encoder.load_state_dict(checkpoint['state_dict_Intrinsic_Encoder'])
         start_epoch = checkpoint['epoch_Intrinsic_Encoder'] + 1
+        optim_checkpoint = torch.load(config.train['resume_optim_Intrinsic'])
+        optimizer_Intrinsic.load_state_dict(optim_checkpoint)
+        for state in optimizer_Intrinsic.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
         
         checkpoint = torch.load(config.train['resume_Integrator'])
         Integrator.load_state_dict(checkpoint['state_dict_Integrator'])
         start_epoch = checkpoint['epoch_Integrator'] + 1
-        optim_checkpoint = torch.load(config.train['resume_optim_G'])
-        optimizer_G.load_state_dict(optim_checkpoint)
-        for state in optimizer_G.state.values():
+        optim_checkpoint = torch.load(config.train['resume_optim_Integrator'])
+        optimizer_Integrator.load_state_dict(optim_checkpoint)
+        for state in optimizer_Integrator.state.values():
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
                     state[k] = v.cuda()
@@ -151,7 +163,7 @@ if __name__ == '__main__':
         checkpoint = torch.load(config.train['resume_D_DOMAIN'])
         D_DOMAIN.load_state_dict(checkpoint['state_dict_D_DOMAIN'])
         
-        start_epoch = checkpoint['epoch_D_DOMAIN'] + 1
+        # start_epoch = checkpoint['epoch_D_DOMAIN'] + 1
         
         optim_checkpoint_VIS = torch.load(config.train['resume_optim_D_VIS'])
         optimizer_D_VIS.load_state_dict(optim_checkpoint_VIS)
