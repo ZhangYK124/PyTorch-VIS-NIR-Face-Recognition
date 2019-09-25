@@ -7,6 +7,7 @@ train['epochs'] = 2000
 train['batch_size'] = 1
 train['num_workers'] = 0
 train['generator_steps'] = 3
+train['save_img_num'] = 1
 
 train['lambda_rec'] = 10.0
 train['lambda_gauss'] = 0.0001
@@ -19,7 +20,7 @@ train['beta1_D'] = 0.5
 train['beta2_D'] = 0.999
 train['weight_decay_D'] = 1e-5
 
-train['lr_G'] = 5e-3
+train['lr_G'] = 1e-3
 train['lr_G_decay_epoch'] = 200
 train['lr_G_decay_rate'] = 0.998
 train['beta1_G'] = 0.5
