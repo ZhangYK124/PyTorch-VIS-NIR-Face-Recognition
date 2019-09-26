@@ -13,7 +13,7 @@ train['lambda_rec'] = 10.0
 train['lambda_gauss'] = 0.0001
 train['lambda_cls'] = 0.0
 
-train['lr_D'] = 1e-3
+train['lr_D'] = 1e-3 * 0.5
 train['lr_D_decay_epoch'] = 200
 train['lr_D_decay_rate'] = 0.998
 train['beta1_D'] = 0.5
