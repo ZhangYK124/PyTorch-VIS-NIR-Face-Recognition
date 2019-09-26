@@ -427,7 +427,8 @@ if __name__ == '__main__':
                             g_cycle =l1_loss(x_real, x_recon) +l1_loss(y_real, y_recon)
                             
                             # mmd loss
-                            g_mmd = mmd(x_intrinsic, y_intrinsic) + mmd(xy_intrinsic, yx_intrinsic) + mmd(x_intrinsic, yx_intrinsic) + mmd(y_intrinsic, xy_intrinsic)
+                            g_mmd = mmd(x_intrinsic, y_intrinsic)
+                                    # + mmd(xy_intrinsic, yx_intrinsic) + mmd(x_intrinsic, yx_intrinsic) + mmd(y_intrinsic, xy_intrinsic)
                             
                             # domain_cls1 = D_DOMAIN(x_intrinsic, y_intrinsic)
                             # domain_cls2 = D_DOMAIN(xy_intrinsic, yx_intrinsic)
@@ -463,7 +464,7 @@ if __name__ == '__main__':
                             # g_loss.backward()
                             # optimizer_G.step()
                             
-                            intrinsic_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv + g_cam * 10.0 + g_mmd + g_intrinsic
+                            intrinsic_loss = g_recon * 5.0 + g_cycle * 5.0 + g_adv + g_cam * 5.0 + g_mmd * 0.0 + g_intrinsic * 1.0
                             style_loss = g_cls
                             integrator_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv + g_cam * 10.0
                             
@@ -624,7 +625,7 @@ if __name__ == '__main__':
                             loss_D_VIS=losses_D_VIS.avg,
                             loss_D_NIR=losses_D_NIR.avg,
                             loss_D_SKETCH=losses_D_SKETCH.avg,
-                            loss_D_DOMAIN=losses_D_DOMAIN.avg,
+                            loss_D_DOMAIN=g_mmd.data.cpu().numpy(),
                             time_left=time_left,
                         )
                         print(bar.suffix)
