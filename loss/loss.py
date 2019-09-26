@@ -65,7 +65,7 @@ class MMD(nn.Module):
     def __init__(self):
         super(MMD,self).__init__()
         
-    def gaussian_kernel(self,source,target,kernel_mul=2.0,kernel_num=5,fix_sigma=None):
+    def gaussian_kernel(self,source,target,kernel_mul=2.0,kernel_num=5,fix_sigma=1.0):
         '''
         Transfer source and target data to kernel matrix
         :param source: Source
@@ -75,11 +75,15 @@ class MMD(nn.Module):
         :param fix_sigma: sigma value of different gaussian kernel
         :return:
         '''
+        source = source.view(source.size()[0],source.size()[1])/(source.max()-source.min())
+        target = target.view(source.size()[0],source.size()[1])/(source.max()-source.min())
         n_samples = int(source.size()[0]) + int(target.size()[0])
         total = torch.cat([source,target],dim=0)
-        total0 = total.unsqueeze(0).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)),int(total.size(2)),int(total.size(3)))
-        total1 = total.unsqueeze(1).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)),int(total.size(2)),int(total.size(3)))
-        L2_distance = ((total0-total1)**2).sum(2)
+        # total0 = total.unsqueeze(0).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)),int(total.size(2)),int(total.size(3)))
+        # total1 = total.unsqueeze(1).expand(int(total.size(0)),int(total.size(0)),int(total.size(1)),int(total.size(2)),int(total.size(3)))
+        total0 = total.unsqueeze(0).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
+        total1 = total.unsqueeze(1).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
+        L2_distance = ((total0-total1)**2).mean(2)
         if fix_sigma:
             bandwidth = fix_sigma
         else:
@@ -90,10 +94,11 @@ class MMD(nn.Module):
         bandwidth /= kernel_mul ** (kernel_num//2)
         bandwidth_list = [bandwidth * (kernel_mul**i) for i in range(kernel_num)]
         # gaussian kernel function
-        kernel_val = [torch.exp(-L2_distance/bandwidth_temp) for bandwidth_temp in bandwidth_list]
+        # kernel_val = [torch.exp(-L2_distance/bandwidth_temp) for bandwidth_temp in bandwidth_list]
+        kernel_val = [-L2_distance / bandwidth_temp for bandwidth_temp in bandwidth_list]
         return sum(kernel_val)
         
-    def forward(self,source,target,kernel_mul=2.0,kernel_num=10,fix_sigma=None):
+    def forward(self,source,target,kernel_mul=2.0,kernel_num=5,fix_sigma=None):
         """
         calculate MMD distance between source and target
         :param source:
