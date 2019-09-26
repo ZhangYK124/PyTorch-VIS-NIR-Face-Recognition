@@ -454,7 +454,7 @@ if __name__ == '__main__':
                             y_cls_label = label2onehot(y_style_logit, c_tgt)
                             
                             g_cls = cross_entropy(x_style_logit, x_cls_label) + cross_entropy(y_style_logit, y_cls_label) \
-                                    + cross_entropy(xy_style_logit, y_cls_label) + cross_entropy(yx_style_logit, x_cls_label)
+                                    + cross_entropy(xy_style_logit, y_cls_label) * 0.0 + cross_entropy(yx_style_logit, x_cls_label) * 0.0
                             
                             # total loss
                             # g_loss = g_recon * 10.0 * 255.0 + g_cycle * 10.0 * 255.0 + g_adv * 1.0 * 0.0 + g_cam * 10.0 * 0.0 + g_cls * 1.0 + g_domain * 0.0 + g_intrinsic * 1.0 * 0.0
