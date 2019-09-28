@@ -464,9 +464,9 @@ if __name__ == '__main__':
                             # g_loss.backward()
                             # optimizer_G.step()
                             
-                            intrinsic_loss = g_recon * 5.0 + g_cycle * 5.0 + g_adv + g_cam * 5.0 + g_mmd * 0.0 + g_intrinsic * 1.0
+                            intrinsic_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv * 0.1 + g_cam * 1.0 + g_mmd * 0.0 + g_intrinsic * 0.1
                             style_loss = g_cls
-                            integrator_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv + g_cam * 10.0
+                            integrator_loss = g_recon * 10.0 + g_cycle * 10.0 + g_adv * 0.1 + g_cam * 1.0
                             
                             optimizer_Intrinsic.zero_grad()
                             intrinsic_loss.backward(retain_graph=True)
