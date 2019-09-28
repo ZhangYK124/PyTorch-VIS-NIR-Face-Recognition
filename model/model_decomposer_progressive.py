@@ -1,6 +1,6 @@
 '''
 star GAN + disentangled learning
-skip connection + no patches
+progressive learning + no patches
 
 We employ a latent domain discriminator to obtain the common feature space between domains rather than MMD.
 
@@ -166,6 +166,33 @@ class Style_Encoder(nn.Module):
         style_feature = self.deconv(style_feature)
         return style_feature, style_logit
 
+class Encoder(nn.Module):
+    '''
+    Style + Intrinsic
+    '''
+    def __init__(self,ngf=64,n_blocks=3):
+        super(Encoder,self).__init__()
+        # **************************    Input    *************************
+        Input = []
+        Input += [nn.Conv2d(in_channels=3,out_channels=ngf,kernel_size=3,stride=1,padding=1,bias=False),
+                  nn.ReflectionPad2d(1),
+                  nn.Conv2d(ngf,ngf,kernel_size=3,stride=1,padding=0,bias=False),
+                  nn.InstanceNorm2d(ngf),
+                  nn.LeakyReLU(0.1,inplace=True),
+                  nn.ReflectionPad2d(1),
+                  nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
+                  nn.InstanceNorm2d(ngf),
+                  nn.LeakyReLU(0.1, inplace=True)
+                  ]
+        self.Input = nn.Sequential(*Input)
+
+        # **************************    Intrinsic    *************************
+        Intrinsic = []
+        
+
+    def forward(self, x):
+        x = self.Input(x)
+        return x
 
 class Intrinsic_Encoder(nn.Module):
     def __init__(self, ngf=64, n_blocks=3):
