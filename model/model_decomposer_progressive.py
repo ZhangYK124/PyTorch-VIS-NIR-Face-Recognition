@@ -300,7 +300,7 @@ class Integrator(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_nc=3, output_nc=3, ngf=128, n_blocks=10, img_size=112):
+    def __init__(self, input_nc=3, output_nc=3, ngf=128, encoder_blocks=6,decoder_blocks=16, img_size=112):
         super(Generator, self).__init__()
         self.conv_in = nn.Conv2d(in_channels=3, out_channels=128, kernel_size=3, stride=1, padding=1, bias=False)
         self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=ngf, out_channel=ngf, kernel_size=7, padding=3, stride=1)
@@ -328,7 +328,7 @@ class Generator(nn.Module):
                         nn.ReLU(True)]
         '''
         
-        for i in range(n_blocks):
+        for i in range(encoder_blocks):
             Encoder += [_Residual_Block(ngf)]
         
         '''
@@ -350,7 +350,7 @@ class Generator(nn.Module):
         '''
         
         Decoder_VIS = []
-        for i in range(n_blocks):
+        for i in range(decoder_blocks):
             Decoder_VIS += [_Residual_Block(ngf),
                             nn.InstanceNorm2d(ngf)]
         Decoder_VIS += [nn.ReflectionPad2d(1),
@@ -358,7 +358,7 @@ class Generator(nn.Module):
                         nn.Tanh()]
         
         Decoder_NIR = []
-        for i in range(n_blocks):
+        for i in range(decoder_blocks):
             Decoder_NIR += [_Residual_Block(ngf),
                             nn.InstanceNorm2d(ngf)]
         Decoder_NIR += [nn.ReflectionPad2d(1),
@@ -366,7 +366,7 @@ class Generator(nn.Module):
                         nn.Tanh()]
         
         Decoder_SKETCH = []
-        for i in range(n_blocks):
+        for i in range(decoder_blocks):
             Decoder_SKETCH += [_Residual_Block(ngf),
                                nn.InstanceNorm2d(ngf)]
         Decoder_SKETCH += [nn.ReflectionPad2d(1),
