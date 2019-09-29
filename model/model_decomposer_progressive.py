@@ -6,6 +6,9 @@ We employ a latent domain discriminator to obtain the common feature space betwe
 
 In order to obtain a high-resolution generative face, we may first generate a larger face images than its original size and down-sample, e.g. 224x224 --> 168x168 --> 112x112.
 
+Three branches might work. Check it out!
+
+w/o CAM
 
 Reference:
 Face Sketch Synthesis by Multi-domain Adversarial Learning.
@@ -297,11 +300,11 @@ class Integrator(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_nc=3, output_nc=3, ngf=64, n_blocks=3, img_size=112):
+    def __init__(self, input_nc=3, output_nc=3, ngf=128, n_blocks=10, img_size=112):
         super(Generator, self).__init__()
-        self.conv_in = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv_in = nn.Conv2d(in_channels=3, out_channels=128, kernel_size=3, stride=1, padding=1, bias=False)
         self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=ngf, out_channel=ngf, kernel_size=7, padding=3, stride=1)
-        self.residual6_2 = self.make_layer(_Residual_Block, 6, in_channel=128, out_channel=128, kernel_size=7, padding=3, stride=1)
+        self.residual6_2 = self.make_layer(_Residual_Block, 6, in_channel=ngf, out_channel=ngf, kernel_size=7, padding=3, stride=1)
         self.residual = self.make_layer(_Residual_Block, 1, in_channel=192, out_channel=192, kernel_size=7, padding=3, stride=1)
         self.bn = nn.BatchNorm2d(128, affine=True)
         self.bn_out = nn.BatchNorm2d(192, affine=True)
@@ -309,90 +312,71 @@ class Generator(nn.Module):
         self.instance = nn.InstanceNorm2d(128, affine=True)
         self.conv_out = nn.Conv2d(in_channels=192, out_channels=3, kernel_size=3, stride=1, padding=1, bias=False)
         self.out = nn.Tanh()
-        self.conv_cls = nn.Conv2d(ngf * 2, 3, kernel_size=int(112 / np.power(2, 6)), bias=False)
-        self.avg_pooling = nn.AdaptiveAvgPool2d((1, 1))
-        self.weight_avg_pooling = nn.AdaptiveAvgPool2d((7, 7))
-        self.pad = nn.ReflectionPad2d(3)
-        self.softmax = nn.Softmax()
-        self.style_cls = nn.Linear(128, 3)
         
-        self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(128, out_channels=512, kernel_size=4, stride=1, padding=0),
-            nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=4, stride=4, padding=1, output_padding=0),
-            nn.InstanceNorm2d(256),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=4, padding=1, output_padding=0),
-            nn.ReflectionPad2d(1),
-            nn.InstanceNorm2d(128)
-        )
-        
-        # **************************    Intrinsic    *************************
-        Intrinsic_Decomposer = []
-        Intrinsic_Decomposer += [nn.ReflectionPad2d(3),
-                                 nn.Conv2d(ngf, ngf, kernel_size=7, stride=1, padding=0, bias=False),
-                                 nn.InstanceNorm2d(ngf),
-                                 nn.ReLU(inplace=True)]
-        
+        Encoder = []
+        Encoder += [nn.Conv2d(input_nc, ngf, kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.InstanceNorm2d(ngf),
+                    nn.ReLU(inplace=True)]
+        '''
         # Down sampling
         n_downsampling = 1
         for i in range(n_downsampling):
             mult = 2 ** i
-            Intrinsic_Decomposer += [nn.ReflectionPad2d(1),
-                                     nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=0, bias=False),
-                                     nn.InstanceNorm2d(ngf * mult * 2),
-                                     nn.ReLU(True)]
+            Encoder += [nn.ReflectionPad2d(1),
+                        nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=0, bias=False),
+                        nn.InstanceNorm2d(ngf * mult * 2),
+                        nn.ReLU(True)]
+        '''
         
-        mult = 2 * n_downsampling
         for i in range(n_blocks):
-            Intrinsic_Decomposer += [_Residual_Block(ngf * mult)]
+            Encoder += [_Residual_Block(ngf)]
         
+        '''
         # Class Activation Map
-        self.gap_fc = nn.Linear(ngf * mult * 2, 1, bias=False)
-        self.gmp_fc = nn.Linear(ngf * mult * 2, 1, bias=False)
-        self.conv1x1 = nn.Conv2d(ngf * mult * 4, ngf * mult, kernel_size=1, stride=1, bias=True)
-        self.relu = nn.ReLU(inplace=True)
+        self.gap_fc_vis = nn.Linear(ngf * mult, 1, bias=False)
+        self.gmp_fc_vis = nn.Linear(ngf * mult, 1, bias=False)
+        self.conv1x1_vis = nn.Conv2d(ngf * mult * 2, ngf * mult, kernel_size=1, stride=1, bias=True)
+        self.relu_vis = nn.ReLU(True)
         
-        # **************************    Style    *************************
-        Style_Decomposer = []
-        Style_Decomposer += [nn.ReflectionPad2d(3),
-                             nn.Conv2d(ngf, ngf, kernel_size=7, stride=1, padding=0, bias=False),
-                             nn.InstanceNorm2d(ngf),
-                             nn.ReLU(inplace=True)]
+        self.gap_fc_nir = nn.Linear(ngf * mult, 1, bias=False)
+        self.gmp_fc_nir = nn.Linear(ngf * mult, 1, bias=False)
+        self.conv1x1_nir = nn.Conv2d(ngf * mult * 2, ngf * mult, kernel_size=1, stride=1, bias=True)
+        self.relu_nir = nn.ReLU(True)
         
-        # Down sampling
-        n_downsampling = 1
-        for i in range(n_downsampling):
-            mult = 2 ** i
-            Style_Decomposer += [nn.ReflectionPad2d(1),
-                                 nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=0, bias=False),
-                                 nn.InstanceNorm2d(ngf * mult * 2),
-                                 nn.ReLU(True)]
+        self.gap_fc_sketch = nn.Linear(ngf * mult, 1, bias=False)
+        self.gmp_fc_sketch = nn.Linear(ngf * mult, 1, bias=False)
+        self.conv1x1_sketch = nn.Conv2d(ngf * mult * 2, ngf * mult, kernel_size=1, stride=1, bias=True)
+        self.relu_sketch = nn.ReLU(True)
+        '''
         
-        mult = 2 * n_downsampling
+        Decoder_VIS = []
         for i in range(n_blocks):
-            Style_Decomposer += [_Residual_Block(ngf * mult)]
+            Decoder_VIS += [_Residual_Block(ngf),
+                            nn.InstanceNorm2d(ngf)]
+        Decoder_VIS += [nn.ReflectionPad2d(1),
+                        nn.Conv2d(in_channels=ngf,out_channels=3,kernel_size=3,stride=1,padding=0,bias=False),
+                        nn.Tanh()]
         
-        # Up sampling
-        Integrator = []
-        for i in range(n_downsampling):
-            mult = 2 ** (n_downsampling - i)
-            Integrator = [nn.Upsample(scale_factor=2, mode='nearest'),
-                          nn.ReflectionPad2d(1),
-                          nn.Conv2d(ngf * mult, ngf * mult // 2, kernel_size=3, stride=1, padding=0, bias=False),
-                          nn.InstanceNorm2d(ngf * mult / 2),
-                          nn.ReLU(True)]
+        Decoder_NIR = []
         for i in range(n_blocks):
-            Integrator += [_Residual_Block(ngf)]
-        Integrator += [nn.ReflectionPad2d(1),
-                       nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
-                       nn.InstanceNorm2d(ngf),
-                       nn.ReflectionPad2d(1),
-                       nn.Conv2d(ngf, 3, kernel_size=3, stride=1, padding=0, bias=True),
-                       nn.Tanh()]
+            Decoder_NIR += [_Residual_Block(ngf),
+                            nn.InstanceNorm2d(ngf)]
+        Decoder_NIR += [nn.ReflectionPad2d(1),
+                        nn.Conv2d(in_channels=ngf, out_channels=3, kernel_size=3, stride=1, padding=0, bias=False),
+                        nn.Tanh()]
         
-        self.Intrinsic_Decomposer = nn.Sequential(*Intrinsic_Decomposer)
-        self.Style_Decomposer = nn.Sequential(*Style_Decomposer)
-        self.Integrator = nn.Sequential(*Integrator)
+        Decoder_SKETCH = []
+        for i in range(n_blocks):
+            Decoder_SKETCH += [_Residual_Block(ngf),
+                               nn.InstanceNorm2d(ngf)]
+        Decoder_SKETCH += [nn.ReflectionPad2d(1),
+                        nn.Conv2d(in_channels=ngf, out_channels=3, kernel_size=3, stride=1, padding=0, bias=False),
+                        nn.Tanh()]
+        
+        self.Encoder = nn.Sequential(*Encoder)
+        self.Decoder_VIS = nn.Sequential(*Decoder_VIS)
+        self.Decoder_NIR = nn.Sequential(*Decoder_NIR)
+        self.Decoder_SKETCH = nn.Sequential(*Decoder_SKETCH)
     
     def make_layer(self, block, num_of_layer, in_channel, out_channel, kernel_size, stride, padding):
         layers = []
@@ -400,59 +384,18 @@ class Generator(nn.Module):
             layers.append(block(in_channel, out_channel, kernel_size, stride, padding))
         return nn.Sequential(*layers)
     
-    def forward(self, x, intrinsic=None, style=None):
-        if intrinsic is None:
-            x = self.conv_in(x)
-            intrinsic_feature = self.Intrinsic_Decomposer(x)
-            style_weight = self.Style_Decomposer(x)
-            # intrinsic_feature = self.hg(intrinsic_feature)
-        
-        else:
-            intrinsic_feature = intrinsic
-            style_weight = style
-        
-        # index = np.arange(style_weight.shape[0])
-        # np.random.shuffle(index)
-        # style_weight = style_weight[index]
-        # feature = torch.cat([intrinsic_feature,style_weight],1)
-        
-        # feature = intrinsic_feature.mul(style_weight)
-        
-        # intrinsic_feature1 = self.pad(intrinsic_feature)
-        # style_weight = self.weight_avg_pooling(style_weight)
-        # # style_weight = torch.mean(style_weight,dim=0)
-        # style_weight = style_weight.expand(128,style_weight.size(0),style_weight.size(1),style_weight.size(2))
-        # feature = F.conv2d(intrinsic_feature1,style_weight,stride=1)
-        
-        # out_cls = self.conv_cls(feature)
-        
-        style_feature = F.adaptive_avg_pool2d(style_weight, 1)
-        style_logit = self.style_cls(style_feature.view(style_feature.shape[0], -1))
-        style_feature = self.deconv(style_feature)
-        
-        feature = torch.cat([intrinsic_feature, style_feature], 1)
-        
-        gap = F.adaptive_avg_pool2d(feature, 1)
-        gap_logit = self.gap_fc(gap.view(feature.shape[0], -1))
-        gap_weight = list(self.gap_fc.parameters())[0]
-        gap = feature * gap_weight.unsqueeze(2).unsqueeze(3)
-        
-        gmp = F.adaptive_max_pool2d(feature, 1)
-        gmp_logit = self.gmp_fc(gmp.view(feature.shape[0], -1))
-        # gmp_logit = self.softmax(gmp_logit)
-        gmp_weight = list(self.gmp_fc.parameters())[0]
-        gmp = feature * gmp_weight.unsqueeze(2).unsqueeze(3)
-        
-        cam_logit = torch.cat([gap_logit, gmp_logit], 1)
-        # out_cls = (gap_logit+gmp_logit)/2.0
-        feature = torch.cat([gap, gmp], 1)
-        feature = self.relu(self.conv1x1(feature))
-        
-        heatmap = torch.sum(feature, dim=1, keepdim=True)
-        
-        # out_cls = self.avg_pooling(out_cls)
-        out = self.Integrator(feature)
-        return out, intrinsic_feature, style_weight, heatmap, cam_logit, style_logit
+    def forward(self, I112, c):
+        x = self.Encoder(I112)
+        # gap = torch.nn.functional.adaptive_avg_pool2d(x,1)
+        # gap_logit = self.gap_
+        if c == 0:
+            Decoder = self.Decoder_VIS
+        elif c == 1:
+            Decoder = self.Decoder_NIR
+        elif c == 2:
+            Decoder = self.Decoder_SKETCH
+        out = Decoder(x)
+        return out
 
 
 class Discriminator(nn.Module):
@@ -466,13 +409,17 @@ class Discriminator(nn.Module):
         
         curr_dim = conv_dim
         for i in range(1, repeat_num):
-            layers.append(nn.Conv2d(curr_dim, curr_dim * 2, kernel_size=4, stride=2, padding=1))
-            layers.append(nn.LeakyReLU(0.01))
+            layers.append(nn.Conv2d(curr_dim, curr_dim * 2, kernel_size=3, stride=2, padding=1))
+            layers.append(nn.LeakyReLU(0.01)),
+            layers.append(_Residual_Block(curr_dim * 2))
+            layers.append(nn.InstanceNorm2d(curr_dim * 2))
+            layers.append(_Residual_Block(curr_dim * 2))
+            layers.append(nn.InstanceNorm2d(curr_dim * 2))
             curr_dim = curr_dim * 2
         
-        kernel_size = int(image_size / np.power(2, repeat_num))
+        kernel_size = int(image_size // np.power(2, repeat_num))
         self.main = nn.Sequential(*layers)
-        self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=kernel_size, stride=1, padding=0, bias=False)
         # self.conv2 = nn.Conv2d(curr_dim, c_dim, kernel_size=kernel_size, bias=False)
     
     def forward(self, x):
