@@ -6,7 +6,7 @@ train['saparately'] = False
 train['epochs'] = 4000
 train['batch_size'] = 1
 train['num_workers'] = 0
-train['generator_steps'] = 2
+train['generator_steps'] = 3
 train['save_img_num'] = 1
 
 train['lambda_rec'] = 10.0
