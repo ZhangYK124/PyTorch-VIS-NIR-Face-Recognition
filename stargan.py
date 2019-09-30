@@ -100,7 +100,15 @@ if __name__ == '__main__':
     #                                       betas=(config.train['beta1_D'], config.train['beta2_D']),
     #                                       weight_decay=config.train['weight_decay_D'])
     
-    optimizer_G = torch.optim.Adam(G.parameters(), lr=config.train['lr_G'],
+    optimizer_G_VIS = torch.optim.Adam(itertools.chain(G.Encoder.parameters(),G.Decoder_VIS.parameters()), lr=config.train['lr_G'],
+                                   betas=(config.train['beta1_G'], config.train['beta2_G']),
+                                   weight_decay=config.train['weight_decay_G'])
+
+    optimizer_G_NIR = torch.optim.Adam(itertools.chain(G.Encoder.parameters(),G.Decoder_NIR.parameters()), lr=config.train['lr_G'],
+                                   betas=(config.train['beta1_G'], config.train['beta2_G']),
+                                   weight_decay=config.train['weight_decay_G'])
+
+    optimizer_G_SKETCH = torch.optim.Adam(itertools.chain(G.Encoder.parameters(),G.Decoder_SKETCH.parameters()), lr=config.train['lr_G'],
                                    betas=(config.train['beta1_G'], config.train['beta2_G']),
                                    weight_decay=config.train['weight_decay_G'])
     
@@ -117,9 +125,25 @@ if __name__ == '__main__':
         checkpoint = torch.load(config.train['resume_G'])
         G.load_state_dict(checkpoint['state_dict_G'])
         start_epoch = checkpoint['epoch_G']
-        optim_checkpoint = torch.load(config.train['resume_optim_G'])
-        optimizer_G.load_state_dict(optim_checkpoint)
-        for state in optimizer_G.state.values():
+        
+        optim_checkpoint = torch.load(config.train['resume_optim_G_VIS'])
+        optimizer_G_VIS.load_state_dict(optim_checkpoint)
+        for state in optimizer_G_VIS.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
+
+        optim_checkpoint = torch.load(config.train['resume_optim_G_NIR'])
+        optimizer_G_NIR.load_state_dict(optim_checkpoint)
+        for state in optimizer_G_NIR.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
+                    
+                    
+        optim_checkpoint = torch.load(config.train['resume_optim_G_SKETCH'])
+        optimizer_G_SKETCH.load_state_dict(optim_checkpoint)
+        for state in optimizer_G_SKETCH.state.values():
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
                     state[k] = v.cuda()
@@ -127,30 +151,44 @@ if __name__ == '__main__':
         G.apply(weights_init)
         start_epoch = 0
     
-    if config.train['resume_D']:
+    if config.train['resume_DG_VIS']:
         checkpoint = torch.load(config.train['resume_DG_VIS'])
         DG_VIS.load_state_dict(checkpoint['state_dict_DG_VIS'])
         
         checkpoint = torch.load(config.train['resume_DL_VIS'])
-        DLVIS.load_state_dict(checkpoint['state_dict_DL_VIS'])
+        DL_VIS.load_state_dict(checkpoint['state_dict_DL_VIS'])
 
-        checkpoint = torch.load(config.train['resume_DG_VIS'])
-        DG_VIS.load_state_dict(checkpoint['state_dict_DG_VIS'])
+        checkpoint = torch.load(config.train['resume_DG_NIR'])
+        DG_NIR.load_state_dict(checkpoint['state_dict_DG_NIR'])
 
-        checkpoint = torch.load(config.train['resume_DL_VIS'])
-        DLVIS.load_state_dict(checkpoint['state_dict_DL_VIS'])
+        checkpoint = torch.load(config.train['resume_DL_NIR'])
+        DL_NIR.load_state_dict(checkpoint['state_dict_DL_NIR'])
         
-        checkpoint = torch.load(config.train['resume_DG_VIS'])
-        DG_VIS.load_state_dict(checkpoint['state_dict_DG_VIS'])
+        checkpoint = torch.load(config.train['resume_DG_SKETCH'])
+        DG_SKETCH.load_state_dict(checkpoint['state_dict_DG_SKETCH'])
 
-        checkpoint = torch.load(config.train['resume_DL_VIS'])
-        DLVIS.load_state_dict(checkpoint['state_dict_DL_VIS'])
-        start_epoch = checkpoint['epoch_D']
+        checkpoint = torch.load(config.train['resume_DL_SKETCH'])
+        DL_SKETCH.load_state_dict(checkpoint['state_dict_DL_SKETCH'])
+        start_epoch = checkpoint['epoch_DL_SKETCH'] + 1
+
+        optim_checkpoint = torch.load(config.train['resume_optim_D_VIS'])
+        optimizer_D_VIS.load_state_dict(optim_checkpoint)
+        for state in optimizer_D_VIS.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
+
+        optim_checkpoint = torch.load(config.train['resume_optim_D_NIR'])
+        optimizer_D_NIR.load_state_dict(optim_checkpoint)
+        for state in optimizer_D_NIR.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
+
+        optim_checkpoint = torch.load(config.train['resume_optim_D_SKETCH'])
+        optimizer_D_SKETCH.load_state_dict(optim_checkpoint)
         
-        optim_checkpoint = torch.load(config.train['resume_optim_D'])
-        optimizer_D.load_state_dict(optim_checkpoint)
-        
-        for state in optimizer_D.state.values():
+        for state in optimizer_D_SKETCH.state.values():
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
                     state[k] = v.cuda()
@@ -176,7 +214,15 @@ if __name__ == '__main__':
         cross_entropy.cuda()
     
     # LR Schedulers
-    lr_schedule_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(config.train['epochs'],
+    lr_schedule_G_VIS = torch.optim.lr_scheduler.LambdaLR(optimizer_G_VIS, lr_lambda=LambdaLR(config.train['epochs'],
+                                                                                      config.train['lr_G_decay_rate'],
+                                                                                      config.train['lr_G_decay_epoch'],
+                                                                                      config.train['lr_G']).step)
+    lr_schedule_G_NIR = torch.optim.lr_scheduler.LambdaLR(optimizer_G_NIR, lr_lambda=LambdaLR(config.train['epochs'],
+                                                                                      config.train['lr_G_decay_rate'],
+                                                                                      config.train['lr_G_decay_epoch'],
+                                                                                      config.train['lr_G']).step)
+    lr_schedule_G_SKETCH = torch.optim.lr_scheduler.LambdaLR(optimizer_G_SKETCH, lr_lambda=LambdaLR(config.train['epochs'],
                                                                                       config.train['lr_G_decay_rate'],
                                                                                       config.train['lr_G_decay_epoch'],
                                                                                       config.train['lr_G']).step)
@@ -241,6 +287,7 @@ if __name__ == '__main__':
             DL_SKETCH.train()
             G.train()
             
+            
             batch_time = AverageMeter()
             data_time = AverageMeter()
             losses_G = AverageMeter()
@@ -263,15 +310,16 @@ if __name__ == '__main__':
             for i, batch in enumerate(trainLoader):
                 for k in batch:
                     batch[k] = batch[k].cuda()
-                
+                step = 0
                 src_list = ['vis', 'nir', 'sketch']
-                # for src in ['vis','nir','sketch']:
-                if True:
-                    src = choice(src_list)
+                for src in src_list:
+                # if True:
+                #     src = choice(src_list)
                     if src == 'vis':
                         c_src = 0
                         DG_X = DG_VIS
                         DL_X = DL_VIS
+                        optimizer_G_X = optimizer_G_VIS
                         optimizer_D_X = optimizer_D_VIS
                         losses_DG_X = losses_DG_VIS
                         losses_DL_X = losses_DL_VIS
@@ -282,6 +330,7 @@ if __name__ == '__main__':
                         c_src = 1
                         DG_X = DG_NIR
                         DL_X = DL_NIR
+                        optimizer_G_X = optimizer_G_NIR
                         optimizer_D_X = optimizer_D_NIR
                         losses_DG_X = losses_DG_NIR
                         losses_DL_X = losses_DL_NIR
@@ -292,6 +341,7 @@ if __name__ == '__main__':
                         c_src = 2
                         DG_X = DG_SKETCH
                         DL_X = DL_SKETCH
+                        optimizer_G_X = optimizer_G_SKETCH
                         optimizer_D_X = optimizer_D_SKETCH
                         losses_DG_X = losses_DG_SKETCH
                         losses_DL_X = losses_DL_SKETCH
@@ -304,13 +354,14 @@ if __name__ == '__main__':
                     while src in target_list:
                         target_list.remove(src)
                     
-                    # for tgt in ['vis', 'nir', 'sketch']:
-                    if True:
-                        tgt = choice(target_list)
+                    for tgt in target_list:
+                    # if True:
+                    #     tgt = choice(target_list)
                         if tgt == 'vis':
                             c_tgt = 0
                             DG_Y = DG_VIS
                             DL_Y = DL_VIS
+                            optimizer_G_Y = optimizer_G_VIS
                             optimizer_D_Y = optimizer_D_VIS
                             losses_DG_Y = losses_DG_VIS
                             losses_DL_Y = losses_DL_VIS
@@ -320,6 +371,7 @@ if __name__ == '__main__':
                             c_tgt = 1
                             DG_Y = DG_NIR
                             DL_Y = DL_NIR
+                            optimizer_G_Y = optimizer_G_NIR
                             optimizer_D_Y = optimizer_D_NIR
                             losses_DG_Y = losses_DG_NIR
                             losses_DL_Y = losses_DL_NIR
@@ -329,12 +381,15 @@ if __name__ == '__main__':
                             c_tgt = 2
                             DG_Y = DG_SKETCH
                             DL_Y = DL_SKETCH
+                            optimizer_G_Y = optimizer_G_SKETCH
                             optimizer_D_Y = optimizer_D_SKETCH
                             losses_DG_Y = losses_DG_SKETCH
                             losses_DL_Y = losses_DL_SKETCH
                             writer_loss_DG_Y_steps = writer_loss_DG_SKETCH_steps
                             writer_loss_DL_Y_steps = writer_loss_DL_SKETCH_steps
                         y_real = batch[tgt]
+                    
+                        step += 1
                         
                         data_time.update(time.time() - end_time)
                         
@@ -348,16 +403,20 @@ if __name__ == '__main__':
                             
                             g_loss_src_y_fake = mse_loss(g_adv_g, torch.ones_like(g_adv_g)) \
                                                 + mse_loss(g_adv_l, torch.ones_like(g_adv_l))
+
+                            optimizer_G_Y.zero_grad()
+                            g_loss_src_y_fake.backward()
+                            optimizer_G_Y.step()
                             
                             # reconstruct to the original domain.
                             x_rec = G(y_fake, c_src)
-                            g_loss_rec = l1_loss(x_rec, x_real)
+                            g_loss_rec = l1_loss(x_rec, x_real) * config.train['lambda_rec']
                             
                             g_loss = g_loss_src_y_fake + config.train['lambda_rec'] * g_loss_rec
                             
-                            optimizer_G.zero_grad()
-                            g_loss.backward()
-                            optimizer_G.step()
+                            optimizer_G_X.zero_grad()
+                            g_loss_rec.backward()
+                            optimizer_G_X.step()
                         
                         # =================================================================================== #
                         #                             3. Train the discriminator                              #
@@ -407,11 +466,11 @@ if __name__ == '__main__':
                         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                         prev_time = time.time()
                         
-                        bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.4f} | LR_D: {lr_D:.4f} | L_G: {loss_G:.4f} ' \
+                        bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.6f} | LR_D: {lr_D:.6f} | L_G: {loss_G:.4f} ' \
                                      '| L_DG_VIS: {loss_DG_VIS:.4f} | L_DL_VIS: {loss_DL_VIS:.4f} ' \
                                      '| L_DL_NIR: {loss_DL_NIR:.4f} | L_DL_NIR: {loss_DL_NIR:.4f} ' \
                                      '| L_DL_SKETCH: {loss_DL_SKETCH:.4f} | L_DL_SKETCH: {loss_DL_SKETCH:.4f} | ETA: {time_left}'.format(
-                            step=i,
+                            step=i * 6 + step,
                             epoch=epoch,
                             lr_G=lr_G,
                             lr_D=lr_D,
@@ -451,14 +510,16 @@ if __name__ == '__main__':
             writer_loss_DG_SKETCH_epochs.add_scalar('epochs/loss_DG_SKETCH', losses_DG_SKETCH.avg, epoch)
             writer_loss_DL_SKETCH_epochs.add_scalar('epochs/loss_DL_SKETCH', losses_DL_SKETCH.avg, epoch)
             
-            lr_schedule_G.step()
+            lr_schedule_G_VIS.step()
+            lr_schedule_G_NIR.step()
+            lr_schedule_G_SKETCH.step()
             lr_schedule_D_VIS.step()
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             
             date = '20190929'
             
-            if epoch % 10 == 0:
+            if epoch % config.train['save_model'] == 0:
                 torch.save({
                     'state_dict_G': G.state_dict(),
                     'epoch_G': epoch,
@@ -474,11 +535,11 @@ if __name__ == '__main__':
                 }, os.path.join(config.train['checkpoint'], 'DL_VIS_' + date + '.pth'))
                 
                 torch.save({
-                    'state_dict_D': DG_NIR.state_dict(),
+                    'state_dict_DG_NIR': DG_NIR.state_dict(),
                     'epoch_DG_NIR': epoch
                 }, os.path.join(config.train['checkpoint'], 'DG_NIR_' + date + '.pth'))
                 torch.save({
-                    'state_dict_D': DL_NIR.state_dict(),
+                    'state_dict_DL_NIR': DL_NIR.state_dict(),
                     'epoch_DL_NIR': epoch
                 }, os.path.join(config.train['checkpoint'], 'DL_NIR_' + date + '.pth'))
                 
@@ -490,9 +551,13 @@ if __name__ == '__main__':
                     'state_dict_DL_SKETCH': DL_SKETCH.state_dict(),
                     'epoch_DL_SKETCH': epoch
                 }, os.path.join(config.train['checkpoint'], 'DL_SKETCH_' + date + '.pth'))
-                
-                torch.save(optimizer_G.state_dict(),
-                           os.path.join(config.train['checkpoint'], 'optimizer_G_' + date + '.pth'))
+
+                torch.save(optimizer_G_VIS.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_G_VIS_' + date + '.pth'))
+                torch.save(optimizer_G_NIR.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_G_NIR_' + date + '.pth'))
+                torch.save(optimizer_G_SKETCH.state_dict(),
+                           os.path.join(config.train['checkpoint'], 'optimizer_G_SKETCH_' + date + '.pth'))
                 torch.save(optimizer_D_VIS.state_dict(),
                            os.path.join(config.train['checkpoint'], 'optimizer_D_VIS_' + date + '.pth'))
                 torch.save(optimizer_D_NIR.state_dict(),
