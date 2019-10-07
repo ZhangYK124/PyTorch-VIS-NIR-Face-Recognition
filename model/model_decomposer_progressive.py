@@ -300,7 +300,7 @@ class Integrator(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_nc=3, output_nc=3, ngf=128, encoder_blocks=6,decoder_blocks=16, img_size=112):
+    def __init__(self, input_nc=3, output_nc=3, ngf=128, encoder_blocks=2,decoder_blocks=4, img_size=112):
         super(Generator, self).__init__()
         self.conv_in = nn.Conv2d(in_channels=3, out_channels=128, kernel_size=3, stride=1, padding=1, bias=False)
         self.residual3 = self.make_layer(_Residual_Block, 3, in_channel=ngf, out_channel=ngf, kernel_size=7, padding=3, stride=1)
@@ -315,7 +315,8 @@ class Generator(nn.Module):
         
         Encoder = []
         Encoder += [nn.Conv2d(input_nc, ngf, kernel_size=3, stride=1, padding=1, bias=False),
-                    nn.InstanceNorm2d(ngf),
+                    # nn.InstanceNorm2d(ngf),
+                    nn.BatchNorm2d(ngf),
                     nn.ReLU(inplace=True)]
         '''
         # Down sampling
@@ -351,27 +352,37 @@ class Generator(nn.Module):
         
         Decoder_VIS = []
         for i in range(decoder_blocks):
-            Decoder_VIS += [_Residual_Block(ngf),
-                            nn.InstanceNorm2d(ngf)]
+            Decoder_VIS += [_Residual_Block(ngf)]
+                            # nn.InstanceNorm2d(ngf)]
         Decoder_VIS += [nn.ReflectionPad2d(1),
-                        nn.Conv2d(in_channels=ngf,out_channels=3,kernel_size=3,stride=1,padding=0,bias=False),
+                        nn.Conv2d(in_channels=ngf,out_channels=ngf//2,kernel_size=3,stride=1,padding=0,bias=False),
+                        # nn.InstanceNorm2d(ngf//2),
+                        nn.BatchNorm2d(ngf//2),
+                        nn.ReflectionPad2d(1),
+                        nn.Conv2d(in_channels=ngf//2,out_channels=3,kernel_size=3,stride=1,padding=0,bias=False),
                         nn.Tanh()]
         
         Decoder_NIR = []
         for i in range(decoder_blocks):
-            Decoder_NIR += [_Residual_Block(ngf),
-                            nn.InstanceNorm2d(ngf)]
+            Decoder_NIR += [_Residual_Block(ngf),]
+                            # nn.InstanceNorm2d(ngf)]
         Decoder_NIR += [nn.ReflectionPad2d(1),
-                        nn.Conv2d(in_channels=ngf, out_channels=3, kernel_size=3, stride=1, padding=0, bias=False),
+                        nn.Conv2d(in_channels=ngf,out_channels=ngf//2,kernel_size=3,stride=1,padding=0,bias=False),
+                        nn.BatchNorm2d(ngf//2),
+                        nn.ReflectionPad2d(1),
+                        nn.Conv2d(in_channels=ngf//2, out_channels=3, kernel_size=3, stride=1, padding=0, bias=False),
                         nn.Tanh()]
         
         Decoder_SKETCH = []
         for i in range(decoder_blocks):
-            Decoder_SKETCH += [_Residual_Block(ngf),
-                               nn.InstanceNorm2d(ngf)]
+            Decoder_SKETCH += [_Residual_Block(ngf),]
+                               # nn.InstanceNorm2d(ngf)]
         Decoder_SKETCH += [nn.ReflectionPad2d(1),
-                        nn.Conv2d(in_channels=ngf, out_channels=3, kernel_size=3, stride=1, padding=0, bias=False),
-                        nn.Tanh()]
+                           nn.Conv2d(in_channels=ngf,out_channels=ngf//2,kernel_size=3,stride=1,padding=0,bias=False),
+                           nn.BatchNorm2d(ngf//2),
+                           nn.ReflectionPad2d(1),
+                           nn.Conv2d(in_channels=ngf//2, out_channels=3, kernel_size=3, stride=1, padding=0, bias=False),
+                           nn.Tanh()]
         
         self.Encoder = nn.Sequential(*Encoder)
         self.Decoder_VIS = nn.Sequential(*Decoder_VIS)
@@ -405,21 +416,22 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         layers = []
         layers.append(nn.Conv2d(3, conv_dim, kernel_size=4, stride=2, padding=1))
-        layers.append(nn.LeakyReLU(0.01))
+        layers.append(nn.LeakyReLU(0.2))
         
         curr_dim = conv_dim
         for i in range(1, repeat_num):
             layers.append(nn.Conv2d(curr_dim, curr_dim * 2, kernel_size=3, stride=2, padding=1))
-            layers.append(nn.LeakyReLU(0.01)),
-            layers.append(_Residual_Block(curr_dim * 2))
-            layers.append(nn.InstanceNorm2d(curr_dim * 2))
-            layers.append(_Residual_Block(curr_dim * 2))
-            layers.append(nn.InstanceNorm2d(curr_dim * 2))
+            layers.append(nn.BatchNorm2d(curr_dim * 2))
+            layers.append(nn.LeakyReLU(0.2))
+            # layers.append(_Residual_Block(curr_dim * 2))
+            # layers.append(nn.InstanceNorm2d(curr_dim * 2))
+            # layers.append(_Residual_Block(curr_dim * 2))
+            # layers.append(nn.InstanceNorm2d(curr_dim * 2))
             curr_dim = curr_dim * 2
         
         kernel_size = int(image_size // np.power(2, repeat_num))
         self.main = nn.Sequential(*layers)
-        self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=kernel_size, stride=1, padding=0, bias=False)
+        self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=3, stride=1, padding=0, bias=False)
         # self.conv2 = nn.Conv2d(curr_dim, c_dim, kernel_size=kernel_size, bias=False)
     
     def forward(self, x):
@@ -428,8 +440,8 @@ class Discriminator(nn.Module):
         # out_cls = self.conv2(h)
         # out_src = F.adaptive_avg_pool2d(out_src, out_src.size()[2:]).view(out_src.size()[0],-1)
         # return out_src, out_cls.view(out_cls.size(0), out_cls.size(1))
-        return out_src
-
+        # return out_src
+        return F.avg_pool2d(out_src, out_src.size()[2:]).view(out_src.size()[0], -1)
 
 class Discriminator_CAM(nn.Module):
     def __init__(self, input_nc=3, ndf=64, n_layers=4):
