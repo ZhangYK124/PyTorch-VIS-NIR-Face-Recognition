@@ -18,6 +18,7 @@ import config_progresive as config
 from DataLoader_Star import Dataset
 
 from model.model_decomposer_progressive import Discriminator, Generator
+# from model.model import Discriminator as DD
 
 
 def weights_init(m):
@@ -65,12 +66,14 @@ if __name__ == '__main__':
                                   num_workers=config.train['num_workers'])
     
     # Model
-    DG_VIS = Discriminator(repeat_num=6)
-    DG_NIR = Discriminator(repeat_num=6)
-    DG_SKETCH = Discriminator(repeat_num=6)
-    DL_VIS = Discriminator(repeat_num=4)
-    DL_NIR = Discriminator(repeat_num=4)
-    DL_SKETCH = Discriminator(repeat_num=4)
+    DG_VIS = Discriminator(repeat_num=4)
+    DG_NIR = Discriminator(repeat_num=4)
+    # DG_NIR = DD()
+    DG_SKETCH = Discriminator(repeat_num=4)
+    DL_VIS = Discriminator(repeat_num=3)
+    DL_NIR = Discriminator(repeat_num=3)
+    # DL_NIR = DD()
+    DL_SKETCH = Discriminator(repeat_num=3)
     G = Generator()
     
     # Losses
@@ -312,6 +315,8 @@ if __name__ == '__main__':
                     batch[k] = batch[k].cuda()
                 step = 0
                 src_list = ['vis', 'nir', 'sketch']
+                random.shuffle(src_list)
+                # src_list = ['vis']
                 for src in src_list:
                 # if True:
                 #     src = choice(src_list)
@@ -351,9 +356,10 @@ if __name__ == '__main__':
                     x_real = batch[src]
                     
                     target_list = ['vis', 'nir', 'sketch']
+                    # target_list = ['nir']
                     while src in target_list:
                         target_list.remove(src)
-                    
+                    random.shuffle(target_list)
                     for tgt in target_list:
                     # if True:
                     #     tgt = choice(target_list)
@@ -423,8 +429,10 @@ if __name__ == '__main__':
                         # =================================================================================== #
                         
                         # **************      real      **************
-                        dy_adv_g = DG_Y(y_real.detach())
-                        dy_adv_l = DL_Y(y_real.detach())
+                        dy_adv_g = DG_Y(y_real)
+                        dy_adv_l = DL_Y(y_real)
+                        # dy_adv_g = DG_NIR(y_real)
+                        # dy_adv_l = DL_NIR(y_real)
                         dy_adv_real = mse_loss(dy_adv_g, torch.ones_like(dy_adv_g)) \
                                       + mse_loss(dy_adv_l, torch.ones_like(dy_adv_l))
                         dy_g = mse_loss(dy_adv_g, torch.ones_like(dy_adv_g))
@@ -435,14 +443,20 @@ if __name__ == '__main__':
                         optimizer_D_Y.zero_grad()
                         
                         # **************      fake      **************
-                        dy_adv_g = DG_Y(y_fake.detach())
-                        dy_adv_l = DL_Y(y_fake.detach())
-                        dy_adv_fake = mse_loss(dy_adv_g, torch.zeros_like(dy_adv_g)) \
-                                      + mse_loss(dy_adv_l, torch.zeros_like(dy_adv_l))
-                        dy_g += mse_loss(dy_adv_g, torch.zeros_like(dy_adv_g))
-                        dy_l += mse_loss(dy_adv_l, torch.zeros_like(dy_adv_l))
+                        y_fake = G(x_real, c_tgt)
+                        # dy_adv_g1 = DG_Y(x_real)
+                        # dy_adv_l1 = DL_Y(x_real)
+                        # dy_adv_g1 = DG_NIR(x_real)
+                        # dy_adv_l1 = DL_NIR(x_real)
+                        dy_adv_g1 = DG_Y(y_fake)
+                        dy_adv_l1 = DL_Y(y_fake)
+                        dy_adv_fake = mse_loss(dy_adv_g1, torch.zeros_like(dy_adv_g)) \
+                                      + mse_loss(dy_adv_l1, torch.zeros_like(dy_adv_l))
+                        dy_g += mse_loss(dy_adv_g1, torch.zeros_like(dy_adv_g))
+                        dy_l += mse_loss(dy_adv_l1, torch.zeros_like(dy_adv_l))
                         
                         optimizer_D_Y.zero_grad()
+                        # dy_adv_fake += dy_adv_real
                         dy_adv_fake.backward()
                         optimizer_D_Y.zero_grad()
                         
@@ -467,6 +481,7 @@ if __name__ == '__main__':
                         prev_time = time.time()
                         
                         bar.suffix = 'Epoch/Step: {epoch}/{step} | LR_G: {lr_G:.6f} | LR_D: {lr_D:.6f} | L_G: {loss_G:.4f} ' \
+                                     '| L_G_Rec: {loss_G_rec:.4f} | L_G_Adv: {loss_G_adv:.4f} ' \
                                      '| L_DG_VIS: {loss_DG_VIS:.4f} | L_DL_VIS: {loss_DL_VIS:.4f} ' \
                                      '| L_DL_NIR: {loss_DL_NIR:.4f} | L_DL_NIR: {loss_DL_NIR:.4f} ' \
                                      '| L_DL_SKETCH: {loss_DL_SKETCH:.4f} | L_DL_SKETCH: {loss_DL_SKETCH:.4f} | ETA: {time_left}'.format(
@@ -474,6 +489,8 @@ if __name__ == '__main__':
                             epoch=epoch,
                             lr_G=lr_G,
                             lr_D=lr_D,
+                            loss_G_adv=g_loss_src_y_fake.data.cpu().numpy(),
+                            loss_G_rec=g_loss_rec.data.cpu().numpy(),
                             loss_G=losses_G.avg,
                             loss_DG_VIS=losses_DG_VIS.avg,
                             loss_DL_VIS=losses_DL_VIS.avg,
@@ -484,7 +501,7 @@ if __name__ == '__main__':
                             time_left=time_left,
                         )
                         print(bar.suffix)
-                        
+                    
                         # Save Image
                         if i % count == 0:
                             fake_y_single = x_real.detach().cpu().numpy()[0]
@@ -517,7 +534,7 @@ if __name__ == '__main__':
             lr_schedule_D_NIR.step()
             lr_schedule_D_SKETCH.step()
             
-            date = '20190929'
+            date = config.train['flag']
             
             if epoch % config.train['save_model'] == 0:
                 torch.save({
